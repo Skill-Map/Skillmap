@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   db:
     image: postgres:15
@@ -5,11 +7,20 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: app
-    ports: ["5432:5432"]
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d
+      - pgdata:/var/lib/postgresql/data
+
   backend:
     build:
       context: .
       dockerfile: infrastructure/docker/backend.Dockerfile
-    ports: ["8000:8000"]
+    ports:
+      - "8001:8000"
     depends_on:
       - db
+
+volumes:
+  pgdata:
