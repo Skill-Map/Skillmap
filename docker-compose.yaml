@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: bestschool_postgres
+    environment:
+      POSTGRES_USER: bestschool_user
+      POSTGRES_PASSWORD: csrnsdrfh
+      POSTGRES_DB: bestschool_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bestschool_user -d bestschool_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build: .
+    container_name: bestschool_backend
+    ports:
+      - "8082:8082"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://bestschool_user:csrnsdrfh@postgres:5432/bestschool_db
+      SECRET_KEY: your-secure-production-secret-key-123456789
+      ENVIRONMENT: development
+      PYTHONPATH: /app:/
+      DEBUG: "True"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./app:/app
+    # Упрощенная команда без сложного Python кода
+    command: >
+      sh -c "sleep 5 &&
+             python /app/create_tables.py &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8082 --reload"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
