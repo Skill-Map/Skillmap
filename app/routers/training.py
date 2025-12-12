@@ -137,3 +137,4 @@ async def delete_training(
         raise HTTPException(status_code=404, detail="Training not found")
     
     return {"message": "Training deleted successfully"}
+

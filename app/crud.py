@@ -218,3 +218,25 @@ async def delete_schedule_day(db: AsyncSession, teacher_id: str, day: str):
             await db.refresh(db_schedule)
     
     return db_schedule
+
+# Добавьте в crud.py
+
+async def get_all_trainings(db: AsyncSession):
+    """Получить все тренировки"""
+    result = await db.execute(
+        select(models.Training)
+        .options(joinedload(models.Training.teacher), joinedload(models.Training.apprentice))
+    )
+    return result.scalars().all()
+
+async def get_users_by_type(db: AsyncSession, user_type: str):
+    """Получить пользователей по типу (all для всех)"""
+    if user_type == "all":
+        result = await db.execute(
+            select(models.User)
+        )
+    else:
+        result = await db.execute(
+            select(models.User).where(models.User.type == user_type)
+        )
+    return result.scalars().all()

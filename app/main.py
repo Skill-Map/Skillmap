@@ -9,7 +9,7 @@ from database import engine, get_db, create_uuid_extension
 import models
 from routers import (
     users, admins, apprentices, teachers,
-    moderators, training, schedule, dev
+    moderators, training, schedule, dev, admin_panel
 )
 from auth import get_current_user
 import crud
@@ -48,6 +48,7 @@ app.include_router(moderators.router)
 app.include_router(training.router)
 app.include_router(schedule.router)
 app.include_router(dev.router)
+app.include_router(admin_panel.router, prefix="/api/v1")
 
 @app.get("/")
 async def root():
