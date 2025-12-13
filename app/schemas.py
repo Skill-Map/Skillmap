@@ -16,9 +16,11 @@ class UserBase(BaseModel):
     name: str
     patronymic: Optional[str] = None
     active: bool = True
+    phone: Optional[str] = Field(None, min_length=11, max_length=11)  # Добавляем phone
 
 class UserCreate(UserBase):
-    password: str
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=72)
     type: UserType
 
 class UserUpdate(BaseModel):
@@ -28,15 +30,26 @@ class UserUpdate(BaseModel):
     patronymic: Optional[str] = None
     password: Optional[str] = None
     active: Optional[bool] = None
+    phone: Optional[str] = Field(None, min_length=11, max_length=11)  # Добавляем
 
 class UserInDB(UserBase):
     id: str
     type: UserType
     up_date: Optional[List[str]] = None
     reg_date: str
-    
+
     class Config:
-        from_attributes = True
+        orm_mode = True
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=64)
+    phone: str = Field(..., min_length=11, max_length=11)
+    surname: str
+    name: str
+    patronymic: Optional[str] = None
+    type: UserType = UserType.APPRENTICE  # По умолчанию студент
+
 
 # Специфичные схемы
 class AdminCreate(UserCreate):
@@ -56,7 +69,7 @@ class ApprenticeCreate(UserCreate):
     status: str = "active"
     track_id: str
     group_code: str
-    advisor_user_id: str
+    advisor_user_id: Optional[str] = None
     hours_per_week: int
     progress_percent: float = 0
     credits_earned: int = 0
@@ -67,7 +80,7 @@ class ApprenticeResponse(UserInDB):
     status: str
     track_id: str
     group_code: str
-    advisor_user_id: str
+    advisor_user_id: Optional[str] = None
     hours_per_week: int
     progress_percent: float
     credits_earned: int

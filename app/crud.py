@@ -1,11 +1,14 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import IntegrityError
 import models
 import schemas
 from auth import get_password_hash
 from typing import List, Optional
 import uuid
+from auth import verify_password
+from models import User
 
 # CRUD для User
 async def get_user(db: AsyncSession, user_id: str):
@@ -26,57 +29,23 @@ async def get_users(db: AsyncSession, skip: int = 0, limit: int = 100):
     )
     return result.scalars().all()
 
-async def create_user(db: AsyncSession, user: schemas.UserCreate):
-    hashed_password = get_password_hash(user.password)
-    
-    # Создаем базового пользователя
-    db_user = models.User(
-        id=str(uuid.uuid4()),
-        email=user.email,
-        surname=user.surname,
-        name=user.name,
-        patronymic=user.patronymic,
-        password=hashed_password,
-        type=user.type,
-        active=user.active
-    )
-    
-    # Заполняем специфичные поля в зависимости от типа
-    if isinstance(user, schemas.AdminCreate):
-        db_user.super_permissions = user.super_permissions
-        db_user.can_manage_roles = user.can_manage_roles
-        db_user.can_manage_billing = user.can_manage_billing
-        db_user.can_impersonate = user.can_impersonate
-    elif isinstance(user, schemas.ApprenticeCreate):
-        db_user.status = user.status
-        db_user.track_id = user.track_id
-        db_user.group_code = user.group_code
-        db_user.advisor_user_id = user.advisor_user_id
-        db_user.hours_per_week = user.hours_per_week
-        db_user.progress_percent = user.progress_percent
-        db_user.credits_earned = user.credits_earned
-        db_user.enrollment_date = user.enrollment_date
-        db_user.expected_graduation = user.expected_graduation
-    elif isinstance(user, schemas.TeacherCreate):
-        db_user.hire_date = user.hire_date
-        db_user.department = user.department
-        db_user.title = user.title
-        db_user.bio = user.bio
-        db_user.specialties = user.specialties
-        db_user.office_hours = user.office_hours
-        db_user.teacher_hours_per_week = user.teacher_hours_per_week
-        db_user.rating = user.rating
-    elif isinstance(user, schemas.ModeratorCreate):
-        db_user.assigned_scope = user.assigned_scope
-        db_user.permissions_scope = user.permissions_scope
-        db_user.on_call = user.on_call
-        db_user.warnings_issued = user.warnings_issued
-        db_user.users_banned = user.users_banned
-    
-    db.add(db_user)
-    await db.commit()
-    await db.refresh(db_user)
-    return db_user
+async def create_user(db: AsyncSession, email: str, password: str, **extra):
+    """
+    Универсальный create_user.
+    Принимает email, password и любые дополнительные поля через **extra
+    """
+    hashed_password = get_password_hash(password)
+    payload = {"id": str(uuid.uuid4()), "email": email, "password": hashed_password}
+    payload.update(extra)
+    user = models.User(**payload)
+    db.add(user)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise
+    await db.refresh(user)
+    return user
 
 async def update_user(db: AsyncSession, user_id: str, user_update: schemas.UserUpdate):
     result = await db.execute(
@@ -240,3 +209,14 @@ async def get_users_by_type(db: AsyncSession, user_type: str):
             select(models.User).where(models.User.type == user_type)
         )
     return result.scalars().all()
+
+async def authenticate_user(db: AsyncSession, username: str, password: str):
+    result = await db.execute(
+        select(User).where(User.email == username)
+    )
+    user = result.scalars().first()
+    if not user:
+        return None
+    if not verify_password(password, user.password):
+        return None
+    return user

@@ -1,25 +1,33 @@
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy import Column, String, DateTime, text
+# database.py
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.orm import declarative_base
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
+# URL базы данных
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@localhost/skillmap")
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://fitness_user:fitness_password@localhost:5432/fitness_db")
-
+# Создаем движок
 engine = create_async_engine(DATABASE_URL, echo=True)
-AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+# Создаем фабрику сессий
+AsyncSessionLocal = async_sessionmaker(
+    engine, 
+    class_=AsyncSession, 
+    expire_on_commit=False
+)
+
+# Базовый класс для моделей
 Base = declarative_base()
 
+# Зависимость для получения сессии базы данных
 async def get_db():
+    """Получение сессии базы данных"""
     async with AsyncSessionLocal() as session:
         try:
             yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
         finally:
             await session.close()
-
-# Функция для создания UUID в PostgreSQL
-def create_uuid_extension():
-    return text("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";")

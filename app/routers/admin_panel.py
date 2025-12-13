@@ -1,7 +1,9 @@
 # app/routers/admin_panel.py
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Dict, Any
+from sqlalchemy import select, or_, func
+from sqlalchemy.orm import joinedload
+from typing import List
 from datetime import datetime
 
 import crud
@@ -12,7 +14,6 @@ import models
 
 router = APIRouter(prefix="/admin-panel", tags=["admin-panel"])
 
-# Полная информация о пользователе для админ-панели
 @router.get("/users/full", response_model=List[schemas.UserInDB])
 async def get_all_users_full(
     skip: int = 0,
@@ -36,7 +37,6 @@ async def get_all_users_full(
     
     return filtered_users
 
-# Назначить пользователя преподавателем с детальными данными
 @router.post("/users/{user_id}/promote-to-teacher")
 async def promote_to_teacher(
     user_id: str,
@@ -70,7 +70,6 @@ async def promote_to_teacher(
         "user": updated_user
     }
 
-# Назначить пользователя администратором
 @router.post("/users/{user_id}/promote-to-admin")
 async def promote_to_admin(
     user_id: str,
@@ -101,40 +100,32 @@ async def promote_to_admin(
         "user": updated_user
     }
 
-# Подробная статистика системы
 @router.get("/stats/detailed")
 async def get_detailed_stats(
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(require_role("admin"))
 ):
     """Получить детальную статистику системы"""
-    from sqlalchemy import func, select
-    
     # Статистика пользователей
-    users_by_type = await crud.get_users_by_type(db, "all")
-    
-    # Количество новых пользователей за последние 30 дней
-    thirty_days_ago = datetime.now().strftime("%d.%m.%Y")
-    # Здесь нужно добавить логику подсчета новых пользователей
+    all_users = await crud.get_users(db, 0, 1000)
     
     # Статистика тренировок
-    trainings = await crud.get_all_trainings(db)
-    
-    # Статистика по дням недели для тренировок
-    day_stats = {}
-    for training in trainings:
-        # Здесь можно добавить логику анализа дат тренировок
+    result = await db.execute(
+        select(models.Training)
+        .options(joinedload(models.Training.teacher), joinedload(models.Training.apprentice))
+    )
+    trainings = result.scalars().all()
     
     return {
         "users": {
-            "total": len(users_by_type),
+            "total": len(all_users),
             "by_type": {
-                "apprentice": len([u for u in users_by_type if u.type == "apprentice"]),
-                "teacher": len([u for u in users_by_type if u.type == "teacher"]),
-                "admin": len([u for u in users_by_type if u.type == "admin"]),
-                "moderator": len([u for u in users_by_type if u.type == "moderator"])
+                "apprentice": len([u for u in all_users if u.type == "apprentice"]),
+                "teacher": len([u for u in all_users if u.type == "teacher"]),
+                "admin": len([u for u in all_users if u.type == "admin"]),
+                "moderator": len([u for u in all_users if u.type == "moderator"])
             },
-            "active": len([u for u in users_by_type if u.active])
+            "active": len([u for u in all_users if u.active])
         },
         "trainings": {
             "total": len(trainings),
@@ -147,7 +138,6 @@ async def get_detailed_stats(
         }
     }
 
-# Поиск пользователей
 @router.get("/users/search")
 async def search_users(
     query: str = Query(..., description="Search query (email, name, surname)"),
@@ -155,8 +145,6 @@ async def search_users(
     current_user: models.User = Depends(require_role("admin"))
 ):
     """Поиск пользователей по email, имени или фамилии"""
-    from sqlalchemy import or_
-    
     result = await db.execute(
         select(models.User).where(
             or_(
@@ -170,7 +158,6 @@ async def search_users(
     users = result.scalars().all()
     return users
 
-# Экспорт данных пользователей (CSV)
 @router.get("/users/export")
 async def export_users(
     db: AsyncSession = Depends(get_db),

@@ -1,17 +1,23 @@
+# models.py
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, JSON, Text, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from database import Base
 import uuid
 
+# ДОБАВЬТЕ этот глобальный словарь в начале файла
+_registry = {}
+
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = {'extend_existing': True}  # Убедитесь, что эта строка есть
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String, unique=True, index=True, nullable=False)
     surname = Column(String, nullable=False)
     name = Column(String, nullable=False)
     patronymic = Column(String)
+    phone = Column(String, unique=True, index=True, nullable=True)  # Добавлено
     password = Column(String, nullable=False)
     active = Column(Boolean, default=True)
     up_date = Column(JSON)  # Список дат
@@ -62,6 +68,7 @@ class User(Base):
 
 class TeacherSchedule(Base):
     __tablename__ = "teacher_schedules"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(String, ForeignKey("users.id"), primary_key=True)
     
@@ -84,6 +91,7 @@ class TeacherSchedule(Base):
 
 class Training(Base):
     __tablename__ = "trainings"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     number_gym = Column(Integer, nullable=False)
