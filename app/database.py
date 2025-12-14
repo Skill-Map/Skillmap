@@ -3,8 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import declarative_base
 import os
 
-# URL базы данных
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@localhost/skillmap")
+# URL базы данных - ИСПОЛЬЗУЕМ localhost:5433 для подключения с хоста к контейнеру
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://bestschool_user:csrnsdrfh@localhost:5433/bestschool_db")
 
 # Создаем движок
 engine = create_async_engine(DATABASE_URL, echo=True)

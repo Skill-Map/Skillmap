@@ -1,7 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List, Any, Dict
 from datetime import datetime
 from enum import Enum
+from uuid import UUID
 
 class UserType(str, Enum):
     ADMIN = "admin"
@@ -33,13 +34,13 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = Field(None, min_length=11, max_length=11)  # Добавляем
 
 class UserInDB(UserBase):
-    id: str
+    id: UUID
     type: UserType
     up_date: Optional[List[str]] = None
     reg_date: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -177,3 +178,210 @@ class TokenData(BaseModel):
 class ApiResponse(BaseModel):
     result: Optional[dict] = None
     error: Optional[str] = None
+    
+# Схемы для курсов
+class CourseBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    description: str = Field(..., min_length=10)
+    category: str = Field(..., pattern="^(it|finance|law|geology|marketing|management)$")
+    category_name: str
+    category_color: str = Field(default="#1A535C", pattern="^#[0-9A-Fa-f]{6}$")
+    icon: Optional[str] = None
+    duration: Optional[str] = None
+    is_public: bool = Field(default=True)
+
+class CourseCreate(CourseBase):
+    pass
+
+class CourseUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = Field(None, min_length=10)
+    category: Optional[str] = Field(None, pattern="^(it|finance|law|geology|marketing|management)$")
+    category_name: Optional[str] = None
+    category_color: Optional[str] = Field(None, pattern="^#[0-9A-Fa-f]{6}$")
+    icon: Optional[str] = None
+    duration: Optional[str] = None
+    is_public: Optional[bool] = None
+
+class CourseResponse(CourseBase):
+    id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+# Схемы для модулей
+class CourseModuleBase(BaseModel):
+    order: int = Field(..., ge=1)
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = None
+    recommended_time: Optional[str] = None
+
+class CourseModuleCreate(CourseModuleBase):
+    course_id: str
+
+class CourseModuleUpdate(BaseModel):
+    order: Optional[int] = Field(None, ge=1)
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    recommended_time: Optional[str] = None
+
+class CourseModuleResponse(CourseModuleBase):
+    id: UUID
+    course_id: UUID
+
+    class Config:
+        from_attributes = True
+
+# Схемы для уроков
+class CourseLessonBase(BaseModel):
+    order: int = Field(..., ge=1)
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = None
+
+
+class CourseLessonCreate(CourseLessonBase):
+    module_id: str
+
+class CourseLessonUpdate(BaseModel):
+    order: Optional[int] = Field(None, ge=1)
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = None
+
+
+class CourseLessonResponse(CourseLessonBase):
+    id: str
+    module_id: str
+
+    class Config:
+        from_attributes = True
+
+# Схемы для вакансий
+class VacancyBase(BaseModel):
+    hh_id: str
+    title: str
+    company: Optional[str] = None
+    salary: Optional[str] = None
+    experience: Optional[str] = None
+    employment: Optional[str] = None
+    description: Optional[str] = None
+    skills: Optional[List[str]] = None
+    url: str
+
+class VacancyCreate(VacancyBase):
+    pass
+
+class VacancyUpdate(BaseModel):
+    title: Optional[str] = None
+    company: Optional[str] = None
+    salary: Optional[str] = None
+    experience: Optional[str] = None
+    employment: Optional[str] = None
+    description: Optional[str] = None
+    skills: Optional[List[str]] = None
+    url: Optional[str] = None
+
+class VacancyResponse(VacancyBase):
+    id: str
+    parsed_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Схемы для связи курса и вакансии
+class CourseVacancyBase(BaseModel):
+    course_id: str
+    vacancy_id: str
+
+class CourseVacancyCreate(CourseVacancyBase):
+    pass
+
+class CourseVacancyResponse(CourseVacancyBase):
+    id: str
+
+    class Config:
+        from_attributes = True
+
+# Схемы для прогресса пользователя
+class UserCourseProgressBase(BaseModel):
+    user_id: str
+    course_id: str
+    current_module_id: Optional[str] = None
+    completed_lessons: List[str] = Field(default_factory=list)
+    progress_percent: float = Field(default=0.0, ge=0.0, le=100.0)
+
+class UserCourseProgressCreate(UserCourseProgressBase):
+    pass
+
+class UserCourseProgressUpdate(BaseModel):
+    current_module_id: Optional[str] = None
+    completed_lessons: Optional[List[str]] = None
+    progress_percent: Optional[float] = Field(None, ge=0.0, le=100.0)
+
+class UserCourseProgressResponse(UserCourseProgressBase):
+    id: str
+    started_at: datetime
+    last_accessed: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+# Схемы для запросов на анализ вакансий
+class UserVacancyRequestBase(BaseModel):
+    user_id: str
+    vacancy_title: str
+    vacancy_links: List[str] = Field(..., min_items=1)
+    user_level: str = Field(..., pattern="^(intern|junior|middle|senior)$")
+
+class UserVacancyRequestCreate(UserVacancyRequestBase):
+    pass
+
+class UserVacancyRequestUpdate(BaseModel):
+    status: Optional[str] = Field(None, pattern="^(pending|processing|completed|failed)$")
+    analysis_result: Optional[dict] = None
+    generated_course_id: Optional[str] = None
+
+class UserVacancyRequestResponse(UserVacancyRequestBase):
+    id: str
+    status: str
+    analysis_result: Optional[dict] = None
+    generated_course_id: Optional[str] = None
+    created_at: datetime
+    processed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+# Детальные схемы для отображения
+class CourseDetailResponse(CourseResponse):
+    modules: List["CourseModuleDetailResponse"] = []
+    vacancies: List[VacancyResponse] = []
+
+class CourseModuleDetailResponse(CourseModuleResponse):
+    lessons: List[CourseLessonResponse] = []
+
+# Для создания всего курса целиком (курс + модули + уроки)
+class FullCourseCreate(BaseModel):
+    course: CourseCreate
+    modules: List[Dict[str, Any]] = Field(
+        ...,
+        description="Список модулей с уроками. Каждый модуль: {'module': CourseModuleCreate, 'lessons': List[CourseLessonCreate]}"
+    )
+
+# Схема для отправки вакансии с фронтенда
+class VacancySubmissionRequest(BaseModel):
+    vacancy_title: str = Field(..., min_length=1, max_length=200)
+    vacancy_links: List[str] = Field(..., min_items=1)
+    user_level: str = Field(..., pattern="^(intern|junior|middle|senior)$")
+
+# Ответ после анализа вакансии
+class VacancyAnalysisResponse(BaseModel):
+    request_id: str
+    status: str
+    common_skills: List[str]
+    required_skills: List[str]
+    skill_gaps: List[str]
+    estimated_duration: str
+    weekly_hours: str
+    generated_course_id: Optional[str] = None

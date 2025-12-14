@@ -5,7 +5,7 @@ from typing import List
 import crud
 import schemas
 from database import get_db
-from auth import get_current_active_user, require_role
+from auth import get_current_user, require_role
 import models
 
 router = APIRouter(prefix="/moderator", tags=["moderators"])
@@ -26,7 +26,7 @@ async def read_moderators(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     if current_user.type not in ["admin", "moderator"]:
         raise HTTPException(
@@ -39,7 +39,7 @@ async def read_moderators(
 async def read_moderator(
     moderator_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     if current_user.type not in ["admin", "moderator"]:
         raise HTTPException(
@@ -56,7 +56,7 @@ async def read_moderator(
 async def update_moderator(
     moderator_update: schemas.UserUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     if current_user.type != "moderator":
         raise HTTPException(
@@ -73,7 +73,7 @@ async def update_moderator(
 async def delete_moderator(
     moderator_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     if current_user.type != "admin":
         raise HTTPException(

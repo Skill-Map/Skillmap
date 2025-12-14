@@ -6,7 +6,7 @@ from datetime import datetime
 import crud
 import schemas
 from database import get_db
-from auth import get_current_active_user
+from auth import get_current_user
 import models
 
 router = APIRouter(prefix="/training", tags=["training"])
@@ -19,7 +19,7 @@ async def create_training(
     date: str = Query(...),  # dd.MM.yyyy
     time_start: str = Query(...),  # HH:mm
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     # Проверяем, что пользователи существуют и имеют правильные типы
     teacher = await crud.get_user(db, trainer_id)
@@ -53,7 +53,7 @@ async def get_available_time(
     number_gym: int = Query(None),
     date: str = Query(None),  # dd.MM.yyyy
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     # Здесь должна быть логика проверки доступного времени
     # Пока возвращаем заглушку
@@ -68,7 +68,7 @@ async def get_available_time(
 async def read_training(
     training_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     training = await crud.get_training(db, training_id)
     if training is None:
@@ -88,7 +88,7 @@ async def read_training(
 async def read_trainer_trainings(
     trainer_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     # Проверяем права доступа
     if current_user.type != "admin" and current_user.id != trainer_id:
@@ -103,7 +103,7 @@ async def read_trainer_trainings(
 async def read_apprentice_trainings(
     apprentice_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     # Проверяем права доступа
     if current_user.type != "admin" and current_user.id != apprentice_id:
@@ -118,7 +118,7 @@ async def read_apprentice_trainings(
 async def delete_training(
     training_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     training = await crud.get_training(db, training_id)
     if training is None:

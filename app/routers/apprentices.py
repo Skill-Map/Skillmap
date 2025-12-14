@@ -5,7 +5,7 @@ from typing import List
 import crud
 import schemas
 from database import get_db
-from auth import get_current_active_user, require_role
+from auth import get_current_user, require_role
 import models
 
 router = APIRouter(prefix="/apprentice", tags=["apprentices"])
@@ -36,7 +36,7 @@ async def read_apprentices(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     return await crud.get_users_by_type(db, "apprentice")
 
@@ -44,7 +44,7 @@ async def read_apprentices(
 async def read_apprentice(
     apprentice_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     db_user = await crud.get_user(db, apprentice_id)
     if db_user is None or db_user.type != "apprentice":
@@ -63,7 +63,7 @@ async def read_apprentice(
 async def update_apprentice(
     apprentice_update: schemas.UserUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     if current_user.type != "apprentice":
         raise HTTPException(
@@ -80,7 +80,7 @@ async def update_apprentice(
 async def delete_apprentice(
     apprentice_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     # Удалять может только админ или сам ученик
     if current_user.type != "admin" and current_user.id != apprentice_id:

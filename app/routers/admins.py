@@ -5,7 +5,7 @@ from typing import List
 import crud
 import schemas
 from database import get_db
-from auth import get_current_active_user, require_role
+from auth import require_role
 import models
 
 router = APIRouter(prefix="/admin", tags=["admins"])

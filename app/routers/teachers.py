@@ -5,7 +5,7 @@ from typing import List
 import crud
 import schemas
 from database import get_db
-from auth import get_current_active_user, require_role
+from auth import get_current_user, require_role
 import models
 
 router = APIRouter(prefix="/trainer", tags=["teachers"])
@@ -26,7 +26,7 @@ async def read_teachers(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     return await crud.get_users_by_type(db, "teacher")
 
@@ -34,7 +34,7 @@ async def read_teachers(
 async def read_teacher(
     teacher_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     db_user = await crud.get_user(db, teacher_id)
     if db_user is None or db_user.type != "teacher":
@@ -45,7 +45,7 @@ async def read_teacher(
 async def update_teacher(
     teacher_update: schemas.UserUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     if current_user.type != "teacher":
         raise HTTPException(
@@ -62,7 +62,7 @@ async def update_teacher(
 async def delete_teacher(
     teacher_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     # Удалять может только админ или сам преподаватель
     if current_user.type != "admin" and current_user.id != teacher_id:

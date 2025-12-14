@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import crud
 import schemas
 from database import get_db
-from auth import get_current_active_user, require_role
+from auth import get_current_user, require_role
 import models
 
 router = APIRouter(prefix="/trainerSchedule", tags=["schedule"])
@@ -16,7 +16,7 @@ async def create_schedule(
     start_time: str = Query(..., description="Start time in HH:mm"),
     end_time: str = Query(..., description="End time in HH:mm"),
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     # Проверяем, что пользователь - учитель или админ
     if current_user.type not in ["admin", "teacher"] or (
@@ -59,7 +59,7 @@ async def create_schedule(
 async def get_schedule(
     trainer_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     schedule = await crud.get_schedule(db, trainer_id)
     if schedule is None:
@@ -79,7 +79,7 @@ async def delete_schedule_day(
     trainer_id: str,
     day: str = Query(..., description="Day to clear: monday, tuesday, etc."),
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     if current_user.type not in ["admin", "teacher"] or (
         current_user.type == "teacher" and current_user.id != trainer_id

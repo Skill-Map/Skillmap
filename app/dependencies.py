@@ -4,8 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from jose import JWTError, jwt
 import os
 from dotenv import load_dotenv
-from database import get_db
+from database import get_db, AsyncSessionLocal
 import crud
+from typing import AsyncGenerator
+from sqlalchemy.ext.asyncio import AsyncSession
 
 load_dotenv()
 
@@ -33,3 +35,12 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Зависимость для получения сессии БД"""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+            

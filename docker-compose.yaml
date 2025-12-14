@@ -26,9 +26,10 @@ services:
       - "8082:8082"
     environment:
       DATABASE_URL: postgresql+asyncpg://bestschool_user:csrnsdrfh@postgres:5432/bestschool_db
-      SECRET_KEY: your-secure-production-secret-key-123456789
+      SECRET_KEY: w8OGMeeu1J5W8mBzp8XF0HYSezuKSMULnTk-hSHFU2NPa54lu3NiZk3lEcADET-O
       ENVIRONMENT: development
       PYTHONPATH: /app:/
+      FRONTEND_ORIGIN: "http://127.0.0.1:5500"
       DEBUG: "True"
     depends_on:
       postgres:

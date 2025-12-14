@@ -72,7 +72,7 @@ async def register(
         
         return {
             "ok": True, 
-            "user_id": user.id,
+            "user_id": str(user.id),
             "access": access_token  # Возвращаем токен сразу
         }
         
@@ -93,5 +93,5 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = await crud.authenticate_user(db, payload.username, payload.password)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
-    access_token = create_access_token({"sub": str(user.id)})
+    access_token = create_access_token({"sub": str(user.id)})  # Преобразуем UUID в строку
     return {"access": access_token, "refresh": None}
