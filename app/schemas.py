@@ -234,15 +234,26 @@ class CourseModuleResponse(CourseModuleBase):
     class Config:
         from_attributes = True
 
-# Схемы для уроков
+
+class CourseLessonMaterial(BaseModel):
+    pptx_url: Optional[str] = None
+    homework_url: Optional[str] = None
+    
+
 class CourseLessonBase(BaseModel):
     order: int = Field(..., ge=1)
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
 
 
-class CourseLessonCreate(CourseLessonBase):
-    module_id: str
+class CourseLessonCreate(BaseModel):
+    module_id: UUID
+    order: int
+    title: str
+    description: Optional[str] = None
+    # материалы можно загружать отдельным endpoint'ом, но можно принимать ссылки:
+    pptx_url: Optional[str] = None
+    homework_url: Optional[str] = None
 
 class CourseLessonUpdate(BaseModel):
     order: Optional[int] = Field(None, ge=1)
@@ -250,9 +261,14 @@ class CourseLessonUpdate(BaseModel):
     description: Optional[str] = None
 
 
-class CourseLessonResponse(CourseLessonBase):
-    id: str
-    module_id: str
+class CourseLessonResponse(BaseModel):
+    id: UUID
+    module_id: UUID
+    order: int
+    title: str
+    description: Optional[str]
+    pptx_url: Optional[str] = None
+    homework_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -385,3 +401,44 @@ class VacancyAnalysisResponse(BaseModel):
     estimated_duration: str
     weekly_hours: str
     generated_course_id: Optional[str] = None
+    
+class LessonSubmissionResponse(BaseModel):
+    id: UUID
+    assignment_id: UUID
+    user_id: str
+    file_url: str
+    filename: Optional[str]
+    status: str
+    grade: Optional[float]
+    feedback: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+        
+        
+class LessonAssignmentResponse(BaseModel):
+    id: UUID
+    user_id: str
+    lesson_id: UUID
+    assigned_by: str
+    assigned_at: datetime
+    due_date: Optional[datetime]
+    status: str
+    note: Optional[str]
+
+    class Config:
+        from_attributes = True
+        
+
+class LessonSubmissionCreate(BaseModel):
+    # будет multipart/form-data: file
+    pass
+
+
+class LessonAssignmentCreate(BaseModel):
+    user_id: str
+    lesson_id: UUID
+    assigned_by: Optional[str] = None  # backend заполнит из current_user
+    due_date: Optional[datetime] = None
+    note: Optional[str] = None

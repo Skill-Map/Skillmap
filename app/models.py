@@ -152,6 +152,8 @@ class CourseLesson(Base):
     order = Column(Integer, nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text)
+    pptx_url = Column(Text, nullable=True)
+    homework_url = Column(Text, nullable=True)
 
     module = relationship("CourseModule", back_populates="lessons")
     
@@ -221,3 +223,43 @@ class UserVacancyRequest(Base):
 
     user = relationship("User")
     generated_course = relationship("Course")
+    
+class LessonAssignment(Base):
+    __tablename__ = "lesson_assignments"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    lesson_id = Column(UUID(as_uuid=True), ForeignKey("course_lessons.id"), nullable=False, index=True)
+    assigned_by = Column(String, ForeignKey("users.id"), nullable=False)  # teacher id
+    assigned_at = Column(DateTime, server_default=func.now())
+    due_date = Column(DateTime, nullable=True)
+    status = Column(String, default="assigned")  # assigned, submitted, reviewed, closed
+    note = Column(Text, nullable=True)
+
+    # relations
+    user = relationship("User", foreign_keys=[user_id])
+    lesson = relationship("CourseLesson")
+    teacher = relationship("User", foreign_keys=[assigned_by])
+    submissions = relationship("LessonSubmission", back_populates="assignment", cascade="all, delete-orphan")
+    
+    
+# Новая модель: отправленный ответ на задание
+class LessonSubmission(Base):
+    __tablename__ = "lesson_submissions"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    assignment_id = Column(UUID(as_uuid=True), ForeignKey("lesson_assignments.id"), nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    file_url = Column(Text, nullable=False)
+    filename = Column(String, nullable=True)
+    status = Column(String, default="sent")  # sent | processing | accepted | rejected
+    grade = Column(Float, nullable=True)
+    feedback = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+
+    # relations
+    assignment = relationship("LessonAssignment", back_populates="submissions")
+    user = relationship("User")
