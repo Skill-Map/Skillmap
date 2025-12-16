@@ -69,7 +69,7 @@ async def get_current_user(
         id=1,
         email=email,
         type="admin",  # По умолчанию админ для разработки
-        is_active=True
+        active=True
     )
 
 def require_role(required_role: str):

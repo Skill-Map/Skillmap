@@ -15,6 +15,7 @@ from routers.teachers.assignments import router as teacher_assignments_router
 from routers.teachers.submissions import router as teacher_submissions_router
 from routers.user_course_progress import router as user_course_progress_router
 from routers.student.submissions import router as student_submissions_router
+from routers.admin import router as admin_router
 
 app = FastAPI(title="Skillmap API", version="1.0.0")
 
@@ -35,6 +36,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.include_router(admin_router)
 
 app.include_router(user_course_progress_router)
 # Public
