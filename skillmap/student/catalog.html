@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Каталог курсов - Skillmap</title>
+    
+    <!-- Tailwind CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Ваши кастомные стили */
+        :root {
+            --color-primary: #1A535C;
+            --color-secondary: #F2C14E;
+            --color-background: #F7F0E3;
+            --color-text: #0F172A;
+        }
+        
+        .bg-background { background-color: var(--color-background); }
+        .text-primary { color: var(--color-primary); }
+        .bg-primary { background-color: var(--color-primary); }
+        .border-primary { border-color: var(--color-primary); }
+        .text-secondary { color: var(--color-secondary); }
+        .bg-secondary { background-color: var(--color-secondary); }
+        
+        /* Анимации */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        .skeleton {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            background-color: #e5e7eb;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        
+        /* Кастомные классы */
+        .course-card {
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        .course-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.15);
+            border-color: var(--color-primary);
+        }
+        
+        .category-filter {
+            padding: 0.625rem 1.25rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .category-filter.active {
+            background-color: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+        }
+        .category-filter:not(.active):hover {
+            background-color: rgba(26, 83, 92, 0.1);
+            border-color: var(--color-primary);
+        }
+        
+        .vacancy-btn {
+            background-color: var(--color-primary);
+            color: white;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            padding: 1rem 2rem;
+            font-size: 1.125rem;
+            font-weight: bold;
+            border-radius: 0.75rem;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .vacancy-btn:hover {
+            background-color: #247582;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(26, 83, 92, 0.2), 0 4px 6px -4px rgba(26, 83, 92, 0.1);
+        }
+        
+        /* Модальные окна */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        
+        .modal-header {
+            padding: 24px 32px;
+            border-bottom: 1px solid #e5e7eb;
+            background: white;
+        }
+        
+        .modal-body {
+            padding: 32px;
+            overflow-y: auto;
+            max-height: 60vh;
+        }
+        
+        .modal-footer {
+            padding: 24px 32px;
+            border-top: 1px solid #e5e7eb;
+            background: white;
+        }
+        
+        /* Roadmap стили */
+        .roadmap-line {
+            position: absolute;
+            left: 24px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: rgba(26, 83, 92, 0.2);
+        }
+        
+        .roadmap-dot {
+            position: absolute;
+            left: 16px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 4px solid white;
+            background-color: var(--color-primary);
+            z-index: 10;
+        }
+        
+        .lesson-item {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        
+        /* Скрытие элементов */
+        [data-hidden] {
+            display: none !important;
+        }
+        
+        /* Навигация */
+        .nav-link {
+            position: relative;
+            transition: color 0.3s ease;
+        }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background-color: var(--color-primary);
+            transition: width 0.3s ease;
+        }
+        .nav-link:hover::after,
+        .nav-link.active::after {
+            width: 100%;
+        }
+        
+        /* Мобильное меню */
+        .mobile-menu {
+            transition: all 0.3s ease;
+            transform: translateY(-100%);
+        }
+        .mobile-menu.open {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+
+<body class="antialiased bg-background">
+    <!-- Обновленный хедер с полупрозрачностью -->
+    <header class="bg-background/80 backdrop-blur-lg sticky top-0 z-40 w-full border-b border-primary/10">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <a href="../index.html" class="flex items-center space-x-3">
+                    <div class="bg-primary p-2 rounded-lg shadow-md">
+                        <img src="../images/logo.png" alt="Skillmap Logo" class="h-7 w-7">
+                    </div>
+                    <span class="text-2xl font-bold text-primary">Skillmap</span>
+                </a>
+
+                <!-- Навигация для десктопа -->
+                <nav class="hidden md:flex items-center space-x-8">
+                    <a href="dashboard.html" class="nav-link text-gray-700 hover:text-primary font-medium">Дашборд</a>
+                    <a href="skills.html" class="nav-link text-gray-700 hover:text-primary font-medium">Навыки</a>
+                    <a href="catalog.html" class="nav-link text-primary font-semibold active">Курсы</a>
+                    <a href="profile.html" class="nav-link text-gray-700 hover:text-primary font-medium">Профиль</a>
+                </nav>
+
+                <!-- Кнопка мобильного меню -->
+                <button id="mobile-menu-button" class="md:hidden p-2 rounded-lg text-gray-700 hover:bg-gray-100">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path id="menu-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        <path id="close-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" style="display: none;"></path>
+                    </svg>
+                </button>
+
+                <!-- Информация о пользователе - ОБНОВЛЕНО: только имя -->
+                <div class="hidden md:flex items-center space-x-4" id="auth-buttons">
+                    <!-- Будет заполнено JavaScript -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Мобильное меню -->
+        <div id="mobile-menu" class="md:hidden mobile-menu absolute top-full left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+            <div class="container mx-auto px-4 py-4">
+                <div class="space-y-3">
+                    <a href="dashboard.html" class="block py-2 px-3 rounded-lg hover:bg-gray-100 text-gray-700 font-medium">Дашборд</a>
+                    <a href="skills.html" class="block py-2 px-3 rounded-lg hover:bg-gray-100 text-gray-700 font-medium">Навыки</a>
+                    <a href="goal.html" class="block py-2 px-3 rounded-lg hover:bg-gray-100 text-gray-700 font-medium">Цель</a>
+                    <a href="catalog.html" class="block py-2 px-3 rounded-lg hover:bg-gray-100 text-primary font-semibold">Курсы</a>
+                    <a href="profile.html" class="block py-2 px-3 rounded-lg hover:bg-gray-100 text-gray-700 font-medium">Профиль</a>
+                    
+                    <div class="pt-4 border-t border-gray-200" id="mobile-auth-buttons">
+                        <!-- Будет заполнено JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="min-h-screen">
+        <!-- Главный CTA для вакансии -->
+        <section class="relative overflow-hidden py-16 md:py-24 bg-white/50">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <h1 class="text-4xl md:text-5xl font-extrabold text-primary tracking-tight mb-6">
+                    Получите индивидуальный план обучения<br>
+                    <span class="text-secondary">под конкретную вакансию</span>
+                </h1>
+                <p class="text-lg text-slate-600 mb-8 max-w-3xl mx-auto">
+                    Мы не обычная онлайн-школа. Мы анализируем требования вакансии и создаем персональную программу подготовки именно для вас.
+                </p>
+                
+                <button id="open-vacancy-modal" class="vacancy-btn inline-flex items-center px-10 py-4 text-xl font-bold rounded-xl">
+                    <i class="fas fa-briefcase mr-3 text-xl"></i>
+                    <span>Прислать вакансию</span>
+                </button>
+                
+                <p class="text-slate-500 text-sm mt-6">
+                    Просто вставьте ссылку на вакансию, и мы создадим персонализированный roadmap
+                </p>
+            </div>
+        </section>
+
+        <!-- Примеры разработанных курсов с фильтрами -->
+        <section class="py-16 md:py-20">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center max-w-3xl mx-auto mb-12">
+                    <h2 class="text-3xl md:text-4xl font-bold text-primary mb-4">Примеры готовых программ</h2>
+                    <p class="text-lg text-slate-600">
+                        Вот несколько примеров курсов, которые мы разрабатывали. Каждый из них представляет собой детальный roadmap 
+                        с пошаговым планом обучения.
+                    </p>
+                </div>
+
+                <!-- Фильтры и поиск с добавленным пробелом между ними -->
+                <div class="mb-10">
+                    <!-- Поиск - УВЕЛИЧЕННОЕ ПОЛЕ с добавленным отступом снизу -->
+                    <div class="mb-8">
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg"></i>
+                            <input type="text" id="search-input" 
+                                   placeholder="Поиск курсов по названию, описанию или ключевым навыкам..."
+                                   class="w-full pl-12 pr-4 py-4 text-lg bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm">
+                        </div>
+                    </div>
+                    
+                    <!-- Категории -->
+                    <div class="flex flex-wrap gap-3 justify-center lg:justify-start" id="category-filters">
+                        <!-- Будет заполнено JavaScript -->
+                    </div>
+                    
+                    <!-- Информация о результатах -->
+                    <div class="text-center text-slate-600 mt-6" id="results-info" data-hidden>
+                        <!-- Будет заполнено JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Скелетон загрузки -->
+                <div id="loading-skeleton" data-hidden>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <!-- Скелетоны будут добавлены через JS -->
+                    </div>
+                </div>
+
+                <!-- Сетка курсов -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" id="courses-grid">
+                    <!-- Будет заполнено JavaScript -->
+                </div>
+
+                <!-- Если нет результатов -->
+                <div class="text-center py-16" id="no-results" data-hidden>
+                    <div class="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-search text-3xl text-gray-400"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Курсы не найдены</h3>
+                    <p class="text-gray-600 mb-6 max-w-md mx-auto">
+                        Попробуйте изменить параметры поиска или выберите другую категорию
+                    </p>
+                    <button id="reset-filters" 
+                            class="px-6 py-3 bg-primary text-white rounded-lg hover:bg-opacity-90 transition font-medium">
+                        Сбросить фильтры
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Модальное окно с roadmap курса -->
+    <div class="modal" id="roadmap-modal">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="modal-content">
+                <!-- Заголовок -->
+                <div class="modal-header sticky top-0">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div id="roadmap-course-icon" class="w-12 h-12 rounded-xl flex items-center justify-center mr-4 shadow-sm">
+                                <i class="text-xl fas fa-graduation-cap"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-2xl font-bold text-gray-900" id="roadmap-course-title"></h2>
+                                <p class="text-gray-500 mt-1" id="roadmap-course-description"></p>
+                            </div>
+                        </div>
+                        <button id="close-roadmap-modal" class="text-gray-400 hover:text-gray-600 transition">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Информация о roadmap -->
+                    <div class="mt-6 bg-blue-50 border border-blue-100 rounded-xl p-4">
+                        <div class="flex items-center">
+                            <i class="fas fa-map text-primary text-lg mr-3"></i>
+                            <div>
+                                <p class="font-semibold text-gray-900">Это пример roadmap, который мы создаем</p>
+                                <p class="text-sm text-gray-600 mt-1">Для вашей вакансии мы разработаем индивидуальный план с учетом вашего текущего уровня и требований работодателя</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Дорожная карта курса -->
+                <div class="modal-body">
+                    <div class="relative">
+                        <!-- Вертикальная линия roadmap -->
+                        <div class="roadmap-line"></div>
+                        
+                        <!-- Этапы roadmap -->
+                        <div class="space-y-12" id="roadmap-stages">
+                            <!-- Будет заполнено JavaScript -->
+                        </div>
+                        
+                        <!-- Конечная точка -->
+                        <div class="relative mt-8">
+                            <div class="absolute left-4 w-8 h-8 rounded-full border-4 border-white bg-secondary flex items-center justify-center z-10">
+                                <i class="fas fa-flag text-white text-sm"></i>
+                            </div>
+                            <div class="ml-16 bg-gradient-to-r from-primary to-secondary text-white rounded-xl p-6">
+                                <h3 class="text-xl font-bold mb-2">Цель достигнута!</h3>
+                                <p class="opacity-90">Вы освоили все необходимые навыки и готовы к целевой позиции</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Футер модального окна -->
+                <div class="modal-footer sticky bottom-0">
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div class="text-gray-600 text-sm text-center sm:text-left">
+                            <i class="fas fa-info-circle text-primary mr-2"></i>
+                            <span>Это примерный план. Для вашей вакансии мы создадим индивидуальный roadmap</span>
+                        </div>
+                        <div class="flex space-x-4">
+                            <button id="close-roadmap-modal-footer" 
+                                    class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+                                Закрыть
+                            </button>
+                            <button id="open-vacancy-from-roadmap" 
+                                    class="vacancy-btn px-8 py-3 font-bold">
+                                <i class="fas fa-briefcase mr-2"></i>Прислать вакансию
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для отправки вакансии -->
+    <div class="modal" id="vacancy-modal">
+        <div class="modal-content max-w-2xl">
+            <!-- Заголовок -->
+            <div class="modal-header">
+                <h2 class="text-2xl font-bold text-primary flex items-center mb-2">
+                    <i class="fas fa-briefcase text-primary mr-3"></i>
+                    Прислать вакансию
+                </h2>
+                <p class="text-slate-600">Укажите название вакансии и ссылки на hh.ru. Мы создадим индивидуальный план обучения</p>
+            </div>
+            
+            <!-- Форма -->
+            <div class="modal-body">
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Название вакансии *</label>
+                        <input type="text" id="vacancy-title" 
+                               placeholder="Например: Junior Frontend Developer"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm">
+                        <p class="text-sm text-slate-500 mt-2">Как называется должность, на которую вы претендуете</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Ссылки на вакансии с hh.ru *</label>
+                        <textarea id="vacancy-links" 
+                                  placeholder="https://hh.ru/vacancy/12345678
+https://hh.ru/vacancy/87654321
+https://hh.ru/vacancy/11223344"
+                                  rows="5"
+                                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm resize-none"></textarea>
+                        <p class="text-sm text-slate-500 mt-2">
+                            Каждую ссылку с новой строки. Можно указать несколько вакансий для сравнения требований
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Ваш текущий уровень</label>
+                        <div class="grid grid-cols-3 gap-3" id="level-selector">
+                            <!-- Будет заполнено JavaScript -->
+                        </div>
+                    </div>
+                    
+                    <div class="text-center py-4" id="vacancy-loading" data-hidden>
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <p class="text-slate-600 mt-2">Анализируем вакансии и создаем индивидуальный план...</p>
+                    </div>
+                    
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4" id="vacancy-error" data-hidden>
+                        <div class="flex items-center">
+                            <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
+                            <p class="text-red-700" id="vacancy-error-text"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4" id="vacancy-success" data-hidden>
+                        <div class="flex items-center">
+                            <i class="fas fa-check-circle text-green-500 mr-3"></i>
+                            <p class="text-green-700" id="vacancy-success-text"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Футер -->
+            <div class="modal-footer">
+                <div class="flex flex-col sm:flex-row justify-between gap-4">
+                    <button id="close-vacancy-modal" 
+                            class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium order-2 sm:order-1">
+                        Отмена
+                    </button>
+                    <button id="submit-vacancy" 
+                            class="vacancy-btn px-8 py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2">
+                        <i class="fas fa-paper-plane mr-2"></i>Создать план обучения
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Футер -->
+    <footer class="bg-primary text-white mt-20">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="grid md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="bg-white p-2 rounded-lg">
+                            <img src="../images/logo.png" alt="Skillmap Logo" class="h-6 w-6">
+                        </div>
+                        <span class="text-xl font-bold">Skillmap</span>
+                    </div>
+                    <p class="text-gray-300 text-sm">
+                        Платформа для построения индивидуальной карты профессионального развития.
+                    </p>
+                </div>
+                
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Навигация</h3>
+                    <ul class="space-y-2">
+                        <li><a href="../index.html" class="text-gray-300 hover:text-white transition">Главная</a></li>
+                        <li><a href="dashboard.html" class="text-gray-300 hover:text-white transition">Дашборд</a></li>
+                        <li><a href="catalog.html" class="text-gray-300 hover:text-white transition">Каталог курсов</a></li>
+                        <li><a href="profile.html" class="text-gray-300 hover:text-white transition">Профиль</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Ресурсы</h3>
+                    <ul class="space-y-2">
+                        <li><a href="skills.html" class="text-gray-300 hover:text-white transition">Навыки</a></li>
+                        <li><a href="goal.html" class="text-gray-300 hover:text-white transition">Постановка целей</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition">Помощь</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition">FAQ</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Контакты</h3>
+                    <ul class="space-y-2">
+                        <li class="text-gray-300">Email: info@skillmap.ru</li>
+                        <li class="text-gray-300">Телефон: +7 (999) 123-45-67</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mt-8 pt-8 border-t border-gray-700 text-center">
+                <p>&copy; 2025 Skillmap. Все права защищены.</p>
+                <div class="mt-4">
+                    <a href="#" class="px-3 text-sm text-gray-300 hover:text-white">Политика конфиденциальности</a>
+                    <a href="#" class="px-3 text-sm text-gray-300 hover:text-white">Условия использования</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Состояние приложения
+        const state = {
+            user: {
+                isAuthenticated: false,
+                email: null,
+                name: null
+            },
+            courses: [],
+            categories: [],
+            filteredCourses: [],
+            selectedCategory: '',
+            searchQuery: '',
+            loading: true,
+            API_BASE_URL: 'http://127.0.0.1:8082',
+            
+            // Модальные окна
+            modals: {
+                roadmap: {
+                    course: null,
+                    modules: [],
+                    lessons: {}
+                },
+                vacancy: {
+                    title: '',
+                    links: '',
+                    selectedLevel: 'junior'
+                }
+            }
+        };
+
+        // Инициализация приложения
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initApp();
+            setupEventListeners();
+            
+            // Добавляем обработчик для мобильного меню
+            setupMobileMenu();
+        });
+
+        // Основная функция инициализации
+        async function initApp() {
+            // Проверка авторизации
+            await checkAuth();
+            
+            // Загрузка данных
+            await loadCourses();
+            await loadCategories();
+            
+            // Отображение данных
+            renderAuthButtons();
+            renderCategoryFilters();
+            renderCourses();
+            
+            // Скрываем скелетон загрузки
+            hideLoadingSkeleton();
+        }
+
+        // Настройка мобильного меню
+        function setupMobileMenu() {
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            const menuIcon = document.getElementById('menu-icon');
+            const closeIcon = document.getElementById('close-icon');
+            
+            if (mobileMenuButton && mobileMenu) {
+                mobileMenuButton.addEventListener('click', () => {
+                    mobileMenu.classList.toggle('open');
+                    
+                    if (mobileMenu.classList.contains('open')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+                
+                // Закрытие меню при клике на ссылки
+                const mobileLinks = mobileMenu.querySelectorAll('a');
+                mobileLinks.forEach(link => {
+                    link.addEventListener('click', () => {
+                        mobileMenu.classList.remove('open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+            }
+        }
+
+        // Проверка авторизации
+        async function checkAuth() {
+            const session = localStorage.getItem('userSession');
+            if (!session) return;
+            
+            try {
+                const parsed = JSON.parse(session);
+                const token = parsed.access;
+                
+                if (!token) return;
+                
+                const response = await fetch(`${state.API_BASE_URL}/api/v1/users/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    state.user.isAuthenticated = true;
+                    state.user.email = userData.email;
+                    state.user.name = userData.name || userData.email.split('@')[0];
+                }
+            } catch (error) {
+                console.error('Ошибка проверки авторизации:', error);
+            }
+        }
+
+        // Загрузка курсов
+        async function loadCourses() {
+            try {
+                const response = await fetch(`${state.API_BASE_URL}/api/courses`);
+                if (response.ok) {
+                    state.courses = await response.json();
+                    state.filteredCourses = [...state.courses];
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки курсов:', error);
+                state.courses = [];
+                state.filteredCourses = [];
+            }
+        }
+
+        // Загрузка категорий
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${state.API_BASE_URL}/api/courses/categories`);
+                if (response.ok) {
+                    state.categories = await response.json();
+                } else {
+                    // Создаем категории из курсов
+                    const uniqueCategories = {};
+                    state.courses.forEach(course => {
+                        if (course.category && course.category_name) {
+                            uniqueCategories[course.category] = {
+                                category: course.category,
+                                category_name: course.category_name,
+                                category_color: course.category_color
+                            };
+                        }
+                    });
+                    state.categories = Object.values(uniqueCategories);
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки категорий:', error);
+                state.categories = [];
+            }
+        }
+
+        // Фильтрация курсов
+        function filterCourses() {
+            let filtered = [...state.courses];
+            
+            // Фильтр по категории
+            if (state.selectedCategory) {
+                filtered = filtered.filter(course => course.category === state.selectedCategory);
+            }
+            
+            // Фильтр по поиску
+            if (state.searchQuery) {
+                const query = state.searchQuery.toLowerCase();
+                filtered = filtered.filter(course => 
+                    (course.name && course.name.toLowerCase().includes(query)) ||
+                    (course.description && course.description.toLowerCase().includes(query)) ||
+                    (course.category_name && course.category_name.toLowerCase().includes(query))
+                );
+            }
+            
+            state.filteredCourses = filtered;
+            updateResultsInfo();
+        }
+
+        // Обновление информации о результатах
+        function updateResultsInfo() {
+            const resultsInfo = document.getElementById('results-info');
+            const countSpan = resultsInfo.querySelector('span') || document.createElement('span');
+            
+            countSpan.textContent = state.filteredCourses.length;
+            countSpan.className = 'font-semibold text-primary';
+            
+            resultsInfo.innerHTML = '';
+            resultsInfo.appendChild(document.createTextNode('Найдено '));
+            resultsInfo.appendChild(countSpan);
+            resultsInfo.appendChild(document.createTextNode(' курсов'));
+            
+            if (state.selectedCategory) {
+                const categoryName = state.categories.find(c => c.category === state.selectedCategory)?.category_name || '';
+                resultsInfo.appendChild(document.createTextNode(` в категории "${categoryName}"`));
+            }
+            
+            // Показываем/скрываем элемент
+            if (state.filteredCourses.length > 0) {
+                resultsInfo.removeAttribute('data-hidden');
+            } else {
+                resultsInfo.setAttribute('data-hidden', '');
+            }
+        }
+
+        // Отображение кнопок авторизации (ОБНОВЛЕНО: только имя пользователя)
+        function renderAuthButtons() {
+            const authContainer = document.getElementById('auth-buttons');
+            const mobileAuthContainer = document.getElementById('mobile-auth-buttons');
+            
+            if (state.user.isAuthenticated) {
+                // Только имя пользователя, без почты
+                authContainer.innerHTML = `
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm font-medium text-gray-700">${state.user.name}</span>
+                        <button id="logout-btn" class="px-4 py-2 text-sm font-semibold rounded-lg text-primary bg-primary/10 hover:bg-primary/20 transition">
+                            Выйти
+                        </button>
+                    </div>
+                `;
+                
+                // В мобильном меню тоже только имя
+                mobileAuthContainer.innerHTML = `
+                    <div class="space-y-2">
+                        <div class="px-3 py-2">
+                            <span class="font-medium text-gray-700">${state.user.name}</span>
+                        </div>
+                        <button id="mobile-logout-btn" class="w-full text-left py-2 px-3 rounded-lg hover:bg-gray-100 text-red-600 font-medium">
+                            Выйти
+                        </button>
+                    </div>
+                `;
+            } else {
+                authContainer.innerHTML = `
+                    <div>
+                        <a href="../index.html#login" class="px-4 py-2 text-sm font-semibold rounded-lg text-primary hover:bg-primary/10 transition">Вход</a>
+                        <a href="../index.html#register" class="px-4 py-2 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-opacity-90">Регистрация</a>
+                    </div>
+                `;
+                
+                mobileAuthContainer.innerHTML = `
+                    <div class="space-y-2">
+                        <a href="../index.html#login" class="block py-2 px-3 rounded-lg hover:bg-gray-100 text-gray-700 font-medium">Вход</a>
+                        <a href="../index.html#register" class="block py-2 px-3 rounded-lg btn-primary font-medium">Регистрация</a>
+                    </div>
+                `;
+            }
+        }
+
+        // Отображение фильтров категорий
+        function renderCategoryFilters() {
+            const container = document.getElementById('category-filters');
+            
+            // Кнопка "Все категории"
+            const allButton = document.createElement('button');
+            allButton.className = `category-filter ${!state.selectedCategory ? 'active' : ''}`;
+            allButton.textContent = 'Все категории';
+            allButton.addEventListener('click', () => {
+                state.selectedCategory = '';
+                updateCategoryFilters();
+                filterCourses();
+                renderCourses();
+            });
+            
+            container.innerHTML = '';
+            container.appendChild(allButton);
+            
+            // Кнопки категорий
+            state.categories.forEach(category => {
+                const button = document.createElement('button');
+                button.className = `category-filter ${state.selectedCategory === category.category ? 'active' : ''}`;
+                button.textContent = category.category_name || category.category;
+                button.addEventListener('click', () => {
+                    state.selectedCategory = category.category;
+                    updateCategoryFilters();
+                    filterCourses();
+                    renderCourses();
+                });
+                container.appendChild(button);
+            });
+        }
+
+        // Обновление активного состояния фильтров
+        function updateCategoryFilters() {
+            const buttons = document.querySelectorAll('#category-filters .category-filter');
+            buttons.forEach(button => {
+                if (button.textContent === 'Все категории') {
+                    button.classList.toggle('active', !state.selectedCategory);
+                } else {
+                    const category = state.categories.find(c => 
+                        c.category_name === button.textContent || c.category === button.textContent
+                    );
+                    if (category) {
+                        button.classList.toggle('active', state.selectedCategory === category.category);
+                    }
+                }
+            });
+        }
+
+        // Отображение курсов
+        function renderCourses() {
+            const container = document.getElementById('courses-grid');
+            const noResults = document.getElementById('no-results');
+            
+            // Очищаем контейнер
+            container.innerHTML = '';
+            
+            if (state.filteredCourses.length === 0) {
+                container.setAttribute('data-hidden', '');
+                noResults.removeAttribute('data-hidden');
+                return;
+            }
+            
+            container.removeAttribute('data-hidden');
+            noResults.setAttribute('data-hidden', '');
+            
+            // Создаем карточки курсов
+            state.filteredCourses.forEach(course => {
+                const card = document.createElement('div');
+                card.className = 'course-card bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden cursor-pointer';
+                card.dataset.courseId = course.id;
+                
+                const categoryColor = course.category_color || '#1A535C';
+                
+                card.innerHTML = `
+                    <div class="px-5 py-3" style="background-color: ${categoryColor}20">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium" style="color: ${categoryColor}">
+                                ${course.category_name || 'Курс'}
+                            </span>
+                            <i class="fas fa-arrow-right text-gray-400"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="flex items-start mb-4">
+                            <div class="w-12 h-12 rounded-xl flex items-center justify-center mr-4 shadow-sm"
+                                 style="background-color: ${categoryColor}20; color: ${categoryColor}">
+                                <i class="text-xl ${course.icon || 'fas fa-graduation-cap'}"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-gray-900 text-xl mb-2">${course.name || 'Без названия'}</h3>
+                                <div class="flex items-center text-sm text-gray-500">
+                                    <i class="fas fa-clock mr-1.5"></i>
+                                    <span>${course.duration || 'Не указано'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p class="text-gray-600 mb-6 leading-relaxed">${course.description || 'Описание курса'}</p>
+                        
+                        <div class="flex items-center text-primary font-semibold">
+                            <span>Посмотреть roadmap</span>
+                            <i class="fas fa-arrow-right ml-2.5"></i>
+                        </div>
+                    </div>
+                `;
+                
+                card.addEventListener('click', () => openRoadmapModal(course));
+                container.appendChild(card);
+            });
+        }
+
+        // Скрытие скелетона загрузки
+        function hideLoadingSkeleton() {
+            document.getElementById('loading-skeleton').setAttribute('data-hidden', '');
+            state.loading = false;
+        }
+
+        // Открытие модального окна roadmap
+        async function openRoadmapModal(course) {
+            state.modals.roadmap.course = course;
+            
+            // Устанавливаем заголовок и описание
+            document.getElementById('roadmap-course-title').textContent = course.name;
+            document.getElementById('roadmap-course-description').textContent = course.description || '';
+            
+            // Устанавливаем иконку
+            const iconElement = document.getElementById('roadmap-course-icon');
+            const categoryColor = course.category_color || '#1A535C';
+            iconElement.style.backgroundColor = `${categoryColor}20`;
+            iconElement.style.color = categoryColor;
+            
+            // Загружаем данные roadmap
+            await loadRoadmapData(course.id);
+            
+            // Показываем модальное окно
+            document.getElementById('roadmap-modal').classList.add('active');
+        }
+
+        // Загрузка данных roadmap
+        async function loadRoadmapData(courseId) {
+            const stagesContainer = document.getElementById('roadmap-stages');
+            stagesContainer.innerHTML = '<div class="text-center py-8"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>';
+            
+            try {
+                // Загружаем модули
+                const modulesResponse = await fetch(`${state.API_BASE_URL}/api/courses/${courseId}/modules`);
+                if (modulesResponse.ok) {
+                    const modules = await modulesResponse.json();
+                    state.modals.roadmap.modules = modules.sort((a, b) => (a.order || 0) - (b.order || 0));
+                    
+                    // Загружаем уроки для каждого модуля
+                    for (const module of state.modals.roadmap.modules) {
+                        const lessonsResponse = await fetch(`${state.API_BASE_URL}/api/courses/${courseId}/modules/${module.id}/lessons`);
+                        if (lessonsResponse.ok) {
+                            const lessons = await lessonsResponse.json();
+                            state.modals.roadmap.lessons[module.id] = lessons.sort((a, b) => (a.order || 0) - (b.order || 0));
+                        }
+                    }
+                    
+                    renderRoadmapStages();
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки данных roadmap:', error);
+                stagesContainer.innerHTML = '<div class="text-center py-8 text-red-500">Ошибка загрузки данных курса</div>';
+            }
+        }
+
+        // Отображение этапов roadmap
+        function renderRoadmapStages() {
+            const container = document.getElementById('roadmap-stages');
+            container.innerHTML = '';
+            
+            state.modals.roadmap.modules.forEach((module, index) => {
+                const lessons = state.modals.roadmap.lessons[module.id] || [];
+                
+                const stageElement = document.createElement('div');
+                stageElement.className = 'relative';
+                stageElement.innerHTML = `
+                    <div class="roadmap-dot" style="top: ${index * 20}px"></div>
+                    
+                    <div class="ml-16">
+                        <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                            <div class="flex items-start justify-between mb-4">
+                                <div>
+                                    <div class="flex items-center mb-3">
+                                        <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mr-3 font-bold">
+                                            ${index + 1}
+                                        </div>
+                                        <h3 class="text-xl font-bold text-gray-900">${module.title || 'Модуль'}</h3>
+                                    </div>
+                                    <p class="text-gray-600 ml-11">${module.description || 'Освоение ключевых навыков этапа'}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-3 ml-11" id="lessons-${module.id}">
+                                <!-- Уроки будут добавлены ниже -->
+                            </div>
+                        </div>
+                        
+                        <div class="ml-6 mt-4 flex items-center text-gray-500 text-sm">
+                            <i class="fas fa-clock mr-2"></i>
+                            <span>Рекомендуемое время на этап: <span class="font-medium">${module.recommended_time || '2-3 недели'}</span></span>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(stageElement);
+                
+                // Добавляем уроки
+                const lessonsContainer = document.getElementById(`lessons-${module.id}`);
+                if (lessons.length > 0) {
+                    lessons.forEach(lesson => {
+                        const lessonElement = document.createElement('div');
+                        lessonElement.className = 'lesson-item';
+                        lessonElement.innerHTML = `
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 w-6 h-6 rounded-full bg-secondary/20 flex items-center justify-center mr-3 mt-0.5">
+                                    <i class="fas fa-check text-secondary text-xs"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-gray-900">${lesson.title || 'Урок'}</h4>
+                                    <p class="text-gray-600 text-sm mt-1">${lesson.description || ''}</p>
+                                    
+                                    <div class="flex flex-wrap gap-2 mt-3">
+                                        <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm">
+                                            <i class="fas fa-book mr-1.5"></i>
+                                            <span>Теория</span>
+                                        </span>
+                                        <span class="px-3 py-1 bg-green-50 text-green-700 rounded-lg text-sm">
+                                            <i class="fas fa-code mr-1.5"></i>
+                                            <span>Практика</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        lessonsContainer.appendChild(lessonElement);
+                    });
+                }
+            });
+        }
+
+        // Открытие модального окна вакансии
+        function openVacancyModal() {
+            document.getElementById('vacancy-modal').classList.add('active');
+            
+            // Сбрасываем поля
+            document.getElementById('vacancy-title').value = '';
+            document.getElementById('vacancy-links').value = '';
+            state.modals.vacancy.selectedLevel = 'junior';
+            
+            // Скрываем сообщения
+            document.getElementById('vacancy-error').setAttribute('data-hidden', '');
+            document.getElementById('vacancy-success').setAttribute('data-hidden', '');
+            document.getElementById('vacancy-loading').setAttribute('data-hidden', '');
+            
+            // Обновляем выбор уровня
+            updateLevelSelector();
+        }
+
+        // Обновление выбора уровня
+        function updateLevelSelector() {
+            const container = document.getElementById('level-selector');
+            const levels = [
+                { value: 'intern', name: 'Стажер', description: 'Без опыта' },
+                { value: 'junior', name: 'Junior', description: '0-1 год опыта' },
+                { value: 'middle', name: 'Middle', description: '1-3 года опыта' },
+                { value: 'senior', name: 'Senior', description: '3+ года опыта' }
+            ];
+            
+            container.innerHTML = '';
+            
+            levels.forEach(level => {
+                const label = document.createElement('label');
+                label.className = `flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition ${state.modals.vacancy.selectedLevel === level.value ? 'border-primary bg-primary/5' : ''}`;
+                
+                label.innerHTML = `
+                    <input type="radio" name="level" value="${level.value}" class="sr-only">
+                    <div class="flex-1">
+                        <div class="font-medium">${level.name}</div>
+                        <div class="text-xs text-gray-500 mt-1">${level.description}</div>
+                    </div>
+                `;
+                
+                const input = label.querySelector('input');
+                input.checked = state.modals.vacancy.selectedLevel === level.value;
+                input.addEventListener('change', () => {
+                    state.modals.vacancy.selectedLevel = level.value;
+                    updateLevelSelector();
+                });
+                
+                container.appendChild(label);
+            });
+        }
+
+        // Создание плана по вакансии
+        async function createVacancyPlan() {
+            const title = document.getElementById('vacancy-title').value.trim();
+            const links = document.getElementById('vacancy-links').value.trim();
+            
+            // Валидация
+            if (!title) {
+                showVacancyError('Введите название вакансии');
+                return;
+            }
+            
+            if (!links) {
+                showVacancyError('Введите хотя бы одну ссылку на вакансию');
+                return;
+            }
+            
+            // Парсим ссылки
+            const linksArray = links.split('\n')
+                .map(link => link.trim())
+                .filter(link => link !== '');
+            
+            // Проверяем ссылки
+            const invalidLinks = linksArray.filter(link => !link.includes('hh.ru/vacancy'));
+            if (invalidLinks.length > 0) {
+                showVacancyError('Пожалуйста, используйте ссылки только на вакансии с сайта hh.ru');
+                return;
+            }
+            
+            // Показываем индикатор загрузки
+            document.getElementById('vacancy-loading').removeAttribute('data-hidden');
+            document.getElementById('vacancy-error').setAttribute('data-hidden', '');
+            document.getElementById('vacancy-success').setAttribute('data-hidden', '');
+            
+            try {
+                const session = localStorage.getItem('userSession');
+                let token = null;
+                
+                if (session) {
+                    try {
+                        const parsed = JSON.parse(session);
+                        token = parsed.access;
+                    } catch (e) {
+                        console.error('Ошибка парсинга сессии:', e);
+                    }
+                }
+                
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+                
+                const response = await fetch(`${state.API_BASE_URL}/api/vacancies/analyze`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({
+                        title: title,
+                        links: linksArray,
+                        level: state.modals.vacancy.selectedLevel
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    
+                    // Сохраняем результат
+                    localStorage.setItem('vacancyAnalysisResult', JSON.stringify(result));
+                    
+                    // Показываем сообщение об успехе
+                    document.getElementById('vacancy-success-text').textContent = 
+                        `Вакансия "${title}" успешно проанализирована! Создан индивидуальный план обучения.`;
+                    document.getElementById('vacancy-success').removeAttribute('data-hidden');
+                    document.getElementById('vacancy-loading').setAttribute('data-hidden', '');
+                    
+                    // Через 3 секунды перенаправляем
+                    setTimeout(() => {
+                        closeVacancyModal();
+                        window.location.href = 'vacancy-plan.html';
+                    }, 3000);
+                    
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    showVacancyError(errorData.detail || 'Ошибка при анализе вакансии');
+                }
+                
+            } catch (error) {
+                showVacancyError('Ошибка при создании плана. Попробуйте еще раз.');
+                console.error('Ошибка создания плана:', error);
+            }
+        }
+
+        // Показать ошибку вакансии
+        function showVacancyError(message) {
+            document.getElementById('vacancy-error-text').textContent = message;
+            document.getElementById('vacancy-error').removeAttribute('data-hidden');
+            document.getElementById('vacancy-loading').setAttribute('data-hidden', '');
+            document.getElementById('vacancy-success').setAttribute('data-hidden', '');
+        }
+
+        // Закрытие модального окна roadmap
+        function closeRoadmapModal() {
+            document.getElementById('roadmap-modal').classList.remove('active');
+        }
+
+        // Закрытие модального окна вакансии
+        function closeVacancyModal() {
+            document.getElementById('vacancy-modal').classList.remove('active');
+        }
+
+        // Выход из системы
+        function logout() {
+            localStorage.removeItem('userSession');
+            state.user.isAuthenticated = false;
+            state.user.email = null;
+            state.user.name = null;
+            renderAuthButtons();
+            window.location.href = '../index.html';
+        }
+
+        // Сброс фильтров
+        function resetFilters() {
+            state.searchQuery = '';
+            state.selectedCategory = '';
+            
+            document.getElementById('search-input').value = '';
+            updateCategoryFilters();
+            filterCourses();
+            renderCourses();
+        }
+
+        // Настройка обработчиков событий
+        function setupEventListeners() {
+            // Поиск
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                state.searchQuery = e.target.value;
+                filterCourses();
+                renderCourses();
+            });
+            
+            // Сброс фильтров
+            document.getElementById('reset-filters').addEventListener('click', resetFilters);
+            
+            // Открытие модального окна вакансии
+            document.getElementById('open-vacancy-modal').addEventListener('click', openVacancyModal);
+            document.getElementById('open-vacancy-from-roadmap').addEventListener('click', () => {
+                closeRoadmapModal();
+                openVacancyModal();
+            });
+            
+            // Закрытие модальных окон
+            document.getElementById('close-roadmap-modal').addEventListener('click', closeRoadmapModal);
+            document.getElementById('close-roadmap-modal-footer').addEventListener('click', closeRoadmapModal);
+            document.getElementById('close-vacancy-modal').addEventListener('click', closeVacancyModal);
+            
+            // Клик по затемнению для закрытия модальных окон
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.classList.remove('active');
+                    }
+                });
+            });
+            
+            // Отправка вакансии
+            document.getElementById('submit-vacancy').addEventListener('click', createVacancyPlan);
+            
+            // Добавляем обработчик для кнопки выхода (если она есть)
+            document.addEventListener('click', (e) => {
+                if (e.target.id === 'logout-btn' || e.target.id === 'mobile-logout-btn') {
+                    logout();
+                }
+            });
+        }
+    </script>
+</body>
+</html>

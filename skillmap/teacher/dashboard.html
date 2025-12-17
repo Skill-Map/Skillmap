@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель преподавателя - Skillmap</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/apexcharts@3.35.0/dist/apexcharts.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.35.0"></script>
+    <style>
+        :root {
+            --color-primary: #1A535C;
+            --color-secondary: #F2C14E;
+            --color-teacher: #0EA5E9; /* Синий для преподавателя */
+        }
+        .teacher-bg { background-color: var(--color-teacher); }
+        .teacher-text { color: var(--color-teacher); }
+        .teacher-border { border-color: var(--color-teacher); }
+        .sidebar { transition: all 0.3s ease; }
+        .main-content { transition: margin-left 0.3s ease; }
+        .badge-teacher { background-color: rgba(14, 165, 233, 0.1); color: var(--color-teacher); }
+        .progress-ring { transform: rotate(-90deg); }
+        .progress-ring-circle {
+            stroke-dasharray: 283;
+            stroke-dashoffset: 283;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+        [x-cloak] { display: none !important; }
+    </style>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="antialiased bg-gray-50" x-data="teacherDashboard()" x-init="init()">
+    <!-- Сайдбар -->
+    <div class="sidebar fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl" x-show="sidebarOpen" @click.away="sidebarOpen = false">
+        <div class="flex flex-col h-full">
+            <div class="p-6 border-b">
+                <div class="flex items-center space-x-3">
+                    <div class="teacher-bg p-2 rounded-lg">
+                        <img src="../images/logo.png" alt="Skillmap Logo" class="h-6 w-6">
+                    </div>
+                    <span class="text-xl font-bold teacher-text">Skillmap Teacher</span>
+                </div>
+            </div>
+            
+            <div class="flex-1 p-4">
+                <div class="space-y-2">
+                    <a href="dashboard.html" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg teacher-bg text-white">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                        </svg>
+                        Дашборд
+                    </a>
+                    <a href="students.html" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-100">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5 2.5c.576.556 1 1.303 1 2.148V21h-6v-1a6 6 0 016-6z"/>
+                        </svg>
+                        Мои студенты
+                    </a>
+                    <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-100">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Материалы
+                    </a>
+                    <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-100">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                        Задания на проверку
+                    </a>
+                    <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-100">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        Аналитика
+                    </a>
+                    <a href="#" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-100">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        Настройки
+                    </a>
+                </div>
+            </div>
+            
+            <div class="p-4 border-t">
+                <div class="flex items-center px-4 py-3">
+                    <div class="w-8 h-8 rounded-full teacher-bg text-white flex items-center justify-center font-bold">
+                        <span x-text="user.initials"></span>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-gray-900" x-text="user.name"></p>
+                        <p class="text-xs text-gray-500">Преподаватель</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Основной контент -->
+    <div class="main-content min-h-screen" :class="{ 'ml-64': sidebarOpen }">
+        <!-- Хедер -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <button @click="sidebarOpen = !sidebarOpen" class="p-2 rounded-lg hover:bg-gray-100">
+                            <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                            </svg>
+                        </button>
+                        <div class="ml-4">
+                            <h1 class="text-xl font-bold text-gray-900">Панель преподавателя</h1>
+                            <p class="text-sm text-gray-500">Управление учебным процессом</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button class="p-2 rounded-full hover:bg-gray-100 relative">
+                            <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                            </svg>
+                            <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                        </button>
+                        <button @click="logout()" class="px-4 py-2 text-sm font-semibold rounded-lg teacher-text border teacher-border hover:teacher-bg hover:text-white transition">
+                            Выйти
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Контент -->
+        <main class="p-6">
+            <!-- Статистика вверху -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500">Всего студентов</p>
+                            <p class="text-2xl font-bold text-gray-900" x-text="stats.totalStudents"></p>
+                        </div>
+                        <div class="p-3 rounded-full teacher-text bg-teacher/10">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5 2.5c.576.556 1 1.303 1 2.148V21h-6v-1a6 6 0 016-6z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500">Активных</p>
+                            <p class="text-2xl font-bold text-gray-900" x-text="stats.activeStudents"></p>
+                        </div>
+                        <div class="p-3 rounded-full bg-green-100 text-green-600">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500">Заданий на проверку</p>
+                            <p class="text-2xl font-bold text-gray-900" x-text="stats.assignmentsToReview"></p>
+                        </div>
+                        <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500">Средний прогресс</p>
+                            <p class="text-2xl font-bold text-gray-900" x-text="`${stats.averageProgress}%`"></p>
+                        </div>
+                        <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- График активности и быстрые действия -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- График активности -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-gray-900">Активность студентов</h2>
+                        <select class="text-sm border rounded-lg px-3 py-1">
+                            <option>За неделю</option>
+                            <option>За месяц</option>
+                            <option>За квартал</option>
+                        </select>
+                    </div>
+                    <div id="activityChart" class="h-64"></div>
+                </div>
+                
+                <!-- Быстрые действия -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Быстрые действия</h2>
+                    <div class="space-y-4">
+                        <button @click="goToStudents()" 
+                                class="w-full flex items-center justify-between p-4 border rounded-lg hover:border-teacher hover:bg-teacher/5 transition">
+                            <div class="flex items-center">
+                                <div class="p-2 rounded-lg teacher-bg text-white mr-3">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5 2.5c.576.556 1 1.303 1 2.148V21h-6v-1a6 6 0 016-6z"/>
+                                    </svg>
+                                </div>
+                                <div class="text-left">
+                                    <p class="font-medium text-gray-900">Просмотр студентов</p>
+                                    <p class="text-sm text-gray-500">Управление всеми студентами</p>
+                                </div>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </button>
+                        
+                        <button @click="reviewAssignments()" 
+                                class="w-full flex items-center justify-between p-4 border rounded-lg hover:border-teacher hover:bg-teacher/5 transition">
+                            <div class="flex items-center">
+                                <div class="p-2 rounded-lg bg-yellow-100 text-yellow-600 mr-3">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                    </svg>
+                                </div>
+                                <div class="text-left">
+                                    <p class="font-medium text-gray-900">Проверка заданий</p>
+                                    <p class="text-sm text-gray-500" x-text="`${stats.assignmentsToReview} заданий ожидают`"></p>
+                                </div>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </button>
+                        
+                        <button @click="createMaterial()" 
+                                class="w-full flex items-center justify-between p-4 border rounded-lg hover:border-teacher hover:bg-teacher/5 transition">
+                            <div class="flex items-center">
+                                <div class="p-2 rounded-lg bg-blue-100 text-blue-600 mr-3">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                    </svg>
+                                </div>
+                                <div class="text-left">
+                                    <p class="font-medium text-gray-900">Создать материал</p>
+                                    <p class="text-sm text-gray-500">Добавить новый учебный материал</p>
+                                </div>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Последние студенты и активность -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Последние студенты -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-gray-900">Последние студенты</h2>
+                        <a href="students.html" class="text-sm teacher-text hover:underline">Все студенты</a>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <template x-for="student in recentStudents" :key="student.id">
+                            <div class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                        <span class="font-medium text-gray-700" x-text="student.initials"></span>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-gray-900" x-text="student.name"></p>
+                                        <p class="text-sm text-gray-500" x-text="student.track"></p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <div class="text-right">
+                                        <p class="text-sm font-medium text-gray-900" x-text="`${student.progress}%`"></p>
+                                        <div class="w-24 h-1 bg-gray-200 rounded-full overflow-hidden">
+                                            <div class="h-full rounded-full teacher-bg" :style="`width: ${student.progress}%`"></div>
+                                        </div>
+                                    </div>
+                                    <button @click="messageStudent(student)" class="p-2 hover:bg-gray-100 rounded-lg">
+                                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                
+                <!-- Недавняя активность -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Недавняя активность</h2>
+                    
+                    <div class="space-y-4">
+                        <template x-for="activity in recentActivities" :key="activity.id">
+                            <div class="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg">
+                                <div :class="`p-2 rounded-full ${activity.iconBg}`">
+                                    <svg class="w-4 h-4" :class="activity.iconColor" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="activity.icon"></path>
+                                    </svg>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900" x-text="activity.title"></p>
+                                    <p class="text-xs text-gray-500 truncate" x-text="activity.details"></p>
+                                    <p class="text-xs text-gray-400 mt-1" x-text="activity.time"></p>
+                                </div>
+                                <span class="text-xs px-2 py-1 rounded-full" :class="activity.badgeClass" x-text="activity.status"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function teacherDashboard() {
+            return {
+                sidebarOpen: window.innerWidth >= 1024,
+                user: {
+                    name: 'Алексей Иванов',
+                    email: 'alexey@example.com',
+                    initials: 'АИ',
+                    role: 'teacher'
+                },
+                stats: {
+                    totalStudents: 42,
+                    activeStudents: 36,
+                    assignmentsToReview: 8,
+                    averageProgress: 68
+                },
+                recentStudents: [
+                    {
+                        id: 1,
+                        name: 'Иван Петров',
+                        initials: 'ИП',
+                        track: 'Frontend-разработка',
+                        progress: 75
+                    },
+                    {
+                        id: 2,
+                        name: 'Мария Сидорова',
+                        initials: 'МС',
+                        track: 'Data Science',
+                        progress: 42
+                    },
+                    {
+                        id: 3,
+                        name: 'Александр Кузнецов',
+                        initials: 'АК',
+                        track: 'DevOps',
+                        progress: 89
+                    },
+                    {
+                        id: 4,
+                        name: 'Елена Васнецова',
+                        initials: 'ЕВ',
+                        track: 'UX/UI дизайн',
+                        progress: 31
+                    },
+                    {
+                        id: 5,
+                        name: 'Дмитрий Попов',
+                        initials: 'ДП',
+                        track: 'Backend-разработка',
+                        progress: 67
+                    }
+                ],
+                recentActivities: [
+                    {
+                        id: 1,
+                        title: 'Задание отправлено на проверку',
+                        details: 'Иван Петров отправил задание "Todo App"',
+                        time: '10 минут назад',
+                        icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+                        iconBg: 'bg-blue-100',
+                        iconColor: 'text-blue-600',
+                        status: 'Новое',
+                        badgeClass: 'bg-blue-100 text-blue-800'
+                    },
+                    {
+                        id: 2,
+                        title: 'Студент завершил модуль',
+                        details: 'Мария Сидорова завершила модуль "Основы Python"',
+                        time: '2 часа назад',
+                        icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+                        iconBg: 'bg-green-100',
+                        iconColor: 'text-green-600',
+                        status: 'Завершено',
+                        badgeClass: 'bg-green-100 text-green-800'
+                    },
+                    {
+                        id: 3,
+                        title: 'Новый вопрос от студента',
+                        details: 'Александр Кузнецов задал вопрос по Docker',
+                        time: '5 часов назад',
+                        icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
+                        iconBg: 'bg-yellow-100',
+                        iconColor: 'text-yellow-600',
+                        status: 'Ожидает',
+                        badgeClass: 'bg-yellow-100 text-yellow-800'
+                    },
+                    {
+                        id: 4,
+                        title: 'Студент изменил цель',
+                        details: 'Елена Васнецова сменила трек на UX/UI дизайн',
+                        time: 'Вчера',
+                        icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
+                        iconBg: 'bg-purple-100',
+                        iconColor: 'text-purple-600',
+                        status: 'Обновлено',
+                        badgeClass: 'bg-purple-100 text-purple-800'
+                    }
+                ],
+                
+                init() {
+                    // Проверка авторизации и роли
+                    const session = localStorage.getItem('userSession');
+                    if (!session) {
+                        window.location.href = '../index.html';
+                        return;
+                    }
+                    
+                    const userData = JSON.parse(session);
+                    if (userData.role !== 'teacher') {
+                        // Если не преподаватель, перенаправляем на соответствующую панель
+                        window.location.href = userData.role === 'admin' ? '../admin/dashboard.html' : '../student/dashboard.html';
+                        return;
+                    }
+                    
+                    this.user.email = userData.email;
+                    this.user.name = userData.name || 'Преподаватель';
+                    this.user.initials = this.getInitials(this.user.name);
+                    
+                    // Инициализация графика
+                    this.initChart();
+                    
+                    // Адаптивное поведение сайдбара
+                    window.addEventListener('resize', () => {
+                        this.sidebarOpen = window.innerWidth >= 1024;
+                    });
+                },
+                
+                getInitials(name) {
+                    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+                },
+                
+                initChart() {
+                    const options = {
+                        series: [{
+                            name: 'Активность',
+                            data: [30, 40, 35, 50, 49, 60, 70, 91]
+                        }],
+                        chart: {
+                            height: '100%',
+                            type: 'line',
+                            zoom: { enabled: false },
+                            toolbar: { show: false }
+                        },
+                        colors: ['#0EA5E9'],
+                        dataLabels: { enabled: false },
+                        stroke: { curve: 'smooth', width: 3 },
+                        grid: { borderColor: '#f1f1f1' },
+                        xaxis: {
+                            categories: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс', 'Пн'],
+                        },
+                        yaxis: {
+                            min: 0,
+                            max: 100,
+                            labels: {
+                                formatter: function(val) {
+                                    return val + '%';
+                                }
+                            }
+                        }
+                    };
+                    
+                    const chart = new ApexCharts(document.querySelector("#activityChart"), options);
+                    chart.render();
+                },
+                
+                goToStudents() {
+                    window.location.href = 'students.html';
+                },
+                
+                reviewAssignments() {
+                    alert('Переход к проверке заданий');
+                    // В реальном приложении: window.location.href = 'assignments.html';
+                },
+                
+                createMaterial() {
+                    alert('Создание нового материала');
+                    // В реальном приложении: window.location.href = 'create-material.html';
+                },
+                
+                messageStudent(student) {
+                    alert(`Написать сообщение студенту: ${student.name}`);
+                },
+                
+                logout() {
+                    localStorage.removeItem('userSession');
+                    window.location.href = '../index.html';
+                }
+            }
+        }
+    </script>
+</body>
+</html>

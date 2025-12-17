@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Roadmap курса — Skillmap</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Alpine.js -->
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  
+  <style>
+    :root {
+      --color-primary: #1A535C;
+      --color-secondary: #F2C14E;
+      --color-background: #F7F0E3;
+      --color-text: #0F172A;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--color-background);
+      color: var(--color-text);
+    }
+    
+    .bg-background { background-color: var(--color-background); }
+    .text-primary { color: var(--color-primary); }
+    .bg-primary { background-color: var(--color-primary); }
+    .border-primary { border-color: var(--color-primary); }
+    .text-secondary { color: var(--color-secondary); }
+    .bg-secondary { background-color: var(--color-secondary); }
+    
+    /* Roadmap стили */
+    .timeline-line {
+      width: 2px;
+      background: linear-gradient(to bottom, var(--color-primary), var(--color-secondary));
+      position: absolute;
+      left: 3.5rem;
+      top: 0;
+      bottom: 0;
+    }
+    
+    /* Навигация */
+    .nav-link {
+      position: relative;
+      transition: color 0.3s ease;
+    }
+    
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: -5px;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background-color: var(--color-primary);
+      transition: width 0.3s ease;
+    }
+    
+    .nav-link:hover::after,
+    .nav-link.active::after {
+      width: 100%;
+    }
+    
+    /* Карточки */
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      border: 1px solid #e5e7eb;
+      transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    }
+    
+    /* Кнопки */
+    .btn-primary {
+      background-color: var(--color-primary);
+      color: white;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    }
+    
+    .btn-primary:hover {
+      background-color: #247582;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(26, 83, 92, 0.2), 0 4px 6px -4px rgba(26, 83, 92, 0.1);
+    }
+    
+    /* Мобильное меню */
+    .mobile-menu {
+      transition: all 0.3s ease;
+      transform: translateY(-100%);
+    }
+    
+    .mobile-menu.open {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+
+<body class="antialiased bg-background min-h-screen flex flex-col" x-data="roadmapApp()" x-init="init()">
+  <!-- ОБНОВЛЕННЫЙ ХЕДЕР -->
+  <header class="bg-background/80 backdrop-blur-lg sticky top-0 z-40 w-full border-b border-primary/10">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-20">
+        <a href="/dashboard" class="flex items-center space-x-3">
+          <div class="bg-primary p-2 rounded-lg shadow-md">
+            <img src="../images/logo.png" alt="Skillmap Logo" class="h-7 w-7">
+          </div>
+          <span class="text-2xl font-bold text-primary">Skillmap</span>
+        </a>
+
+        <!-- Навигация для десктопа -->
+        <nav class="hidden md:flex items-center space-x-8">
+          <a href="dashboard.html" class="nav-link text-gray-700 hover:text-primary font-medium">Дашборд</a>
+          <a href="skills.html" class="nav-link text-gray-700 hover:text-primary font-medium">Навыки</a>
+          <a href="catalog.html" class="nav-link text-gray-700 hover:text-primary font-medium">Курсы</a>
+          <a href="profile.html" class="nav-link text-gray-700 hover:text-primary font-medium">Профиль</a>
+        </nav>
+
+        <!-- Информация о пользователе -->
+        <div class="hidden md:flex items-center space-x-4">
+          <span class="text-sm font-medium text-gray-700" x-text="user ? `${user.name} ${user.surname}` : ''"></span>
+          <button @click="logout()" class="px-4 py-2 text-sm font-semibold rounded-lg text-primary bg-primary/10 hover:bg-primary/20 transition">
+            Выйти
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- PAGE CONTENT -->
+  <main class="flex-grow">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-6xl">
+      <!-- Заголовок -->
+      <div class="mb-8">
+        <h1 class="text-4xl md:text-5xl font-extrabold text-primary tracking-tight mb-4">
+          Roadmap курса
+        </h1>
+        <p class="text-lg text-slate-600">
+          Последовательность модулей и уроков вашего курса
+        </p>
+      </div>
+
+      <!-- Прогресс курса -->
+      <div class="card p-6 mb-8">
+        <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
+          <div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2" x-text="course ? course.name : 'Ваш курс'"></h3>
+            <p class="text-gray-600" x-text="course ? course.description : 'Описание курса'"></p>
+          </div>
+          
+          <div class="mt-4 md:mt-0">
+            <template x-if="progress">
+              <div class="text-right">
+                <p class="text-sm text-gray-500">Общий прогресс</p>
+                <p class="text-2xl font-bold text-primary" x-text="calculateTotalProgress() + '%'"></p>
+              </div>
+            </template>
+          </div>
+        </div>
+        
+        <div class="w-full bg-gray-200 rounded-full h-3">
+          <div class="bg-gradient-to-r from-primary to-secondary h-3 rounded-full transition-all duration-500" 
+               :style="'width: ' + calculateTotalProgress() + '%'"></div>
+        </div>
+      </div>
+
+      <!-- Сообщение, если курс отсутствует -->
+      <div x-show="!loading && !progress" class="card p-12 text-center">
+        <div class="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+          <i class="fas fa-graduation-cap text-3xl text-gray-400"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-900 mb-4">Вы пока не зачислены ни на один курс</h2>
+        <p class="text-gray-600 mb-8 max-w-md mx-auto">
+          Выберите курс в каталоге или отправьте заявку — мы поможем вам начать обучение.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <a href="catalog.html" class="btn-primary px-8 py-3 rounded-lg font-bold">
+            <i class="fas fa-book-open mr-2"></i>Перейти в каталог курсов
+          </a>
+        </div>
+      </div>
+
+      <!-- Roadmap отображается, если есть прогресс -->
+      <div x-show="!loading && progress" class="relative">
+        <div class="absolute timeline-line rounded left-14 top-6 bottom-6"></div>
+
+        <div class="space-y-8">
+          <!-- Перебор модулей -->
+          <template x-for="module in modulesSorted" :key="module.id">
+            <div class="relative flex items-start">
+              <!-- Точка на линии -->
+              <div class="z-10 w-12 h-12 flex items-center justify-center rounded-full border-4 shadow-lg"
+                   :class="moduleLocked(module) ? 
+                          'bg-gray-300 border-gray-300 text-white' : 
+                          'bg-primary border-primary text-white'">
+                <span class="font-bold text-lg" x-text="module.order"></span>
+              </div>
+
+              <!-- Карточка модуля -->
+              <div class="ml-8 w-full">
+                <div class="card p-6" :class="{'opacity-60': moduleLocked(module)}">
+                  <!-- Заголовок модуля -->
+                  <div class="flex flex-col md:flex-row md:items-start justify-between mb-6">
+                    <div class="flex-1">
+                      <div class="flex items-center mb-3">
+                        <div class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mr-3 font-bold">
+                          <span x-text="module.order"></span>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-900" x-text="module.title"></h3>
+                      </div>
+                      <p class="text-gray-600 ml-13" x-text="module.description || 'Описание модуля'"></p>
+                      <template x-if="module.recommended_time">
+                        <p class="text-sm text-gray-500 ml-13 mt-2">
+                          <i class="fas fa-clock mr-2"></i>
+                          <span x-text="`Рекомендуемое время: ${module.recommended_time}`"></span>
+                        </p>
+                      </template>
+                    </div>
+
+                    <!-- Прогресс модуля -->
+                    <div class="mt-4 md:mt-0 text-right">
+                      <p class="text-sm text-gray-500">Прогресс по модулю</p>
+                      <p class="text-2xl font-bold text-primary" x-text="moduleProgressPercent(module) + '%'"></p>
+                    </div>
+                  </div>
+
+                  <!-- Уроки модуля -->
+                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <template x-for="lesson in module.lessons" :key="lesson.id">
+                      <div class="border rounded-xl p-4" :class="getLessonCardClass(lesson)">
+                        <!-- Заголовок урока -->
+                        <div class="flex items-start justify-between mb-3">
+                          <div class="flex-1">
+                            <h4 class="font-bold text-gray-900" x-text="`${lesson.order}. ${lesson.title}`"></h4>
+                            <p class="text-sm text-gray-500 mt-1" x-text="lesson.description || ''"></p>
+                          </div>
+                          <div class="ml-2">
+                            <span class="px-3 py-1 rounded-full text-xs font-medium" 
+                                  :class="getLessonBadgeClass(lesson)"
+                                  x-text="lessonStatusText(lesson)"></span>
+                          </div>
+                        </div>
+
+                        <!-- Информация об уроке -->
+                        <div class="text-xs text-gray-500 space-y-2 mb-4">
+                          <template x-if="lesson.recommended_time">
+                            <div class="flex items-center">
+                              <i class="fas fa-clock mr-2"></i>
+                              <span x-text="lesson.recommended_time"></span>
+                            </div>
+                          </template>
+                          <div class="flex items-center">
+                            <i class="fas fa-graduation-cap mr-2"></i>
+                            <span x-text="lesson.type === 'theory' ? 'Теоретический' : 'Практический'"></span>
+                          </div>
+                        </div>
+
+                        <!-- Материалы и действия -->
+                        <div class="flex flex-wrap gap-2">
+                          <!-- Кнопка скачивания презентации -->
+                          <a :href="lesson.materials?.pptx || '#'" 
+                             :class="{'opacity-50 cursor-not-allowed': !lesson.materials?.pptx}"
+                             class="flex items-center px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition text-sm font-medium">
+                            <i class="fas fa-file-powerpoint mr-2"></i>
+                            <span>PPTX</span>
+                          </a>
+
+                          <!-- Кнопка скачивания домашнего задания -->
+                          <a :href="lesson.materials?.homework || '#'" 
+                             :class="{'opacity-50 cursor-not-allowed': !lesson.materials?.homework}"
+                             class="flex items-center px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition text-sm font-medium">
+                            <i class="fas fa-file-word mr-2"></i>
+                            <span>DOCX</span>
+                          </a>
+
+                          <!-- Кнопка прикрепления ответа -->
+                          <button @click="openSubmitModal(lesson)"
+                                  :disabled="!isLessonAvailable(lesson)"
+                                  :class="{'opacity-50 cursor-not-allowed': !isLessonAvailable(lesson)}"
+                                  class="flex items-center px-3 py-2 bg-primary text-white rounded-lg hover:bg-opacity-90 transition text-sm font-medium">
+                            <i class="fas fa-paperclip mr-2"></i>
+                            <span>Ответ</span>
+                          </button>
+
+                          <!-- Статус отправки -->
+                          <template x-if="submissions[lesson.id]">
+                            <div class="flex items-center text-xs text-green-600 ml-2">
+                              <i class="fas fa-check-circle mr-1"></i>
+                              <span x-text="submissions[lesson.id].status === 'accepted' ? 'Принято' : 'Отправлено'"></span>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- Конечная точка Roadmap -->
+          <div class="relative mt-12">
+            <div class="absolute left-14 w-16 h-16 rounded-full border-4 border-white bg-gradient-to-br from-primary to-secondary flex items-center justify-center z-10 shadow-lg">
+              <i class="fas fa-flag-checkered text-white text-xl"></i>
+            </div>
+            <div class="ml-24 bg-gradient-to-r from-primary to-secondary text-white rounded-2xl p-8">
+              <h3 class="text-2xl font-bold mb-3">Курс завершён!</h3>
+              <p class="opacity-90">Поздравляем! Вы успешно освоили все модули курса и готовы к новым достижениям.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ОБНОВЛЕННЫЙ ФУТЕР -->
+  <footer class="bg-primary text-white mt-20">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div class="grid md:grid-cols-4 gap-8">
+        <div>
+          <div class="flex items-center space-x-3 mb-4">
+            <div class="bg-white p-2 rounded-lg">
+              <img src="../images/logo.png" alt="Skillmap Logo" class="h-6 w-6">
+            </div>
+            <span class="text-xl font-bold">Skillmap</span>
+          </div>
+          <p class="text-gray-300 text-sm">
+            Платформа для построения индивидуальной карты профессионального развития.
+          </p>
+        </div>
+        
+        <div>
+          <h3 class="font-bold text-lg mb-4">Навигация</h3>
+          <ul class="space-y-2">
+            <li><a href="../index.html" class="text-gray-300 hover:text-white transition">Главная</a></li>
+            <li><a href="dashboard.html" class="text-gray-300 hover:text-white transition">Дашборд</a></li>
+            <li><a href="catalog.html" class="text-gray-300 hover:text-white transition">Каталог курсов</a></li>
+            <li><a href="profile.html" class="text-gray-300 hover:text-white transition">Профиль</a></li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-bold text-lg mb-4">Ресурсы</h3>
+          <ul class="space-y-2">
+            <li><a href="skills.html" class="text-gray-300 hover:text-white transition">Навыки</a></li>
+            <li><a href="#" class="text-gray-300 hover:text-white transition">Помощь</a></li>
+            <li><a href="#" class="text-gray-300 hover:text-white transition">FAQ</a></li>
+            <li><a href="#" class="text-gray-300 hover:text-white transition">Поддержка</a></li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-bold text-lg mb-4">Контакты</h3>
+          <ul class="space-y-2">
+            <li class="text-gray-300">Email: info@skillmap.ru</li>
+            <li class="text-gray-300">Телефон: +7 (999) 123-45-67</li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="mt-8 pt-8 border-t border-gray-700 text-center">
+        <p>&copy; 2025 Skillmap. Все права защищены.</p>
+        <div class="mt-4">
+          <a href="#" class="px-3 text-sm text-gray-300 hover:text-white">Политика конфиденциальности</a>
+          <a href="#" class="px-3 text-sm text-gray-300 hover:text-white">Условия использования</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- МОДАЛ: загрузка ответа -->
+  <div x-show="submitModal.open" x-cloak class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-lg">
+      <div class="p-8">
+        <div class="flex items-start justify-between mb-8">
+          <div>
+            <h3 class="text-2xl font-bold text-gray-900">Прикрепить домашнее задание</h3>
+            <p class="text-gray-600 mt-2" x-text="submitModal.lesson ? submitModal.lesson.title : ''"></p>
+          </div>
+          <button @click="closeSubmitModal()" class="text-gray-400 hover:text-gray-700 transition">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+
+        <div class="space-y-6">
+          <!-- Информация -->
+          <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <div class="flex items-center mb-3">
+              <i class="fas fa-info-circle text-primary mr-2"></i>
+              <p class="font-medium text-gray-900">Требования к файлу</p>
+            </div>
+            <ul class="text-sm text-gray-600 space-y-1">
+              <li>• Поддерживаемые форматы: .docx, .pdf, .zip</li>
+              <li>• Максимальный размер: 50MB</li>
+              <li>• Назовите файл по шаблону: Фамилия_УрокНомер</li>
+            </ul>
+          </div>
+
+          <!-- Поле загрузки файла -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-3">
+              Выберите файл с выполненным заданием *
+            </label>
+            <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl hover:border-primary transition">
+              <div class="space-y-2 text-center">
+                <i class="fas fa-cloud-upload-alt text-3xl text-gray-400"></i>
+                <div class="flex text-sm text-gray-600">
+                  <label for="submissionFile" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark">
+                    <span>Выберите файл</span>
+                    <input id="submissionFile" name="submissionFile" type="file" class="sr-only" 
+                           @change="onFileSelect($event)">
+                  </label>
+                  <p class="pl-1">или перетащите сюда</p>
+                </div>
+                <p class="text-xs text-gray-500" x-text="submitModal.file ? submitModal.file.name : 'DOCX, PDF или ZIP до 50 МБ'"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Кнопки -->
+          <div class="flex gap-4 pt-4">
+            <button @click="submitAnswer()" 
+                    :disabled="!submitModal.file"
+                    class="flex-1 btn-primary px-6 py-3 rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+              <i class="fas fa-paper-plane mr-2"></i>Отправить
+            </button>
+            <button @click="closeSubmitModal()" 
+                    class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+              Отмена
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*
+  Используем ваши роутеры:
+  - GET  /api/courses/{course_id}/full      (вы добавили этот роут)
+    -> возвращает { course: {...}, modules: [...], total_modules, total_lessons }
+  - GET  /api/user-course-progress/me      (предполагается endpoint, должен возвращать UserCourseProgressResponse)
+  - POST /api/user-course-progress/{progress_id}/lessons/{lesson_id}/submission
+    -> принимает form-data file и возвращает { status: 'sent'|'processing'|'accepted', ... }
+
+  Если в lesson нет поля materials, фронтенд попытается запросить /api/lessons/{lesson_id}/materials (опционально).
+*/
+
+function roadmapApp(){
+  return {
+    API_BASE: 'http://127.0.0.1:8082',
+    loading: true,
+    user: null,
+    progress: null,
+    course: null,
+    modules: [],
+    submissions: {},
+    submitModal: { open: false, lesson: null, file: null },
+    token: null,
+
+    async init(){
+      try {
+        // Получаем токен из сессии
+        const session = localStorage.getItem('userSession');
+        if (session) {
+          const parsed = JSON.parse(session);
+          this.token = parsed.access;
+          this.user = {
+            name: parsed.name || 'Пользователь',
+            surname: parsed.surname || ''
+          };
+        }
+        
+        await this.fetchProgress();
+
+        if (this.progress && this.progress.course_id) {
+          await this.fetchFullCourse(this.progress.course_id);
+        }
+      } catch(e) {
+        console.error('Ошибка инициализации:', e);
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    authHeaders() {
+      const h = { 'Content-Type': 'application/json' };
+      if (this.token) h['Authorization'] = `Bearer ${this.token}`;
+      return h;
+    },
+
+    async fetchProgress(){
+      try {
+        // Этот endpoint должен быть реализован на бэке и возвращать UserCourseProgressResponse
+        const res = await fetch(`${this.API_BASE}/api/user-course-progress/me`, { 
+          headers: this.authHeaders() 
+        });
+        
+        if (res.status === 404) {
+          this.progress = null;
+          return;
+        }
+        
+        if (!res.ok) {
+          console.warn('fetchProgress error', res.status);
+          this.progress = null;
+          return;
+        }
+        
+        const data = await res.json();
+        this.progress = data.progress || data;
+      } catch (e) {
+        console.warn('fetchProgress', e);
+        this.progress = null;
+      }
+    },
+
+    async fetchFullCourse(courseId){
+      try {
+        const res = await fetch(`${this.API_BASE}/api/courses/${courseId}/full`, { 
+          headers: this.authHeaders() 
+        });
+        
+        if (!res.ok) throw new Error('Не удалось загрузить курс');
+        
+        const data = await res.json();
+        this.course = data.course || data;
+        this.modules = data.modules || [];
+
+        // сортируем модули и уроки по order
+        this.modules.sort((a,b)=>a.order - b.order);
+        this.modules.forEach(m=>{
+          if (m.lessons && Array.isArray(m.lessons)) {
+            m.lessons.sort((x,y)=>x.order - y.order);
+            // если нет материалов — попробуем подгрузить (опционально)
+            m.lessons.forEach(async lesson=>{
+              if (!lesson.materials) {
+                try {
+                  const r = await fetch(`${this.API_BASE}/api/lessons/${lesson.id}/materials`, { 
+                    headers: this.authHeaders() 
+                  });
+                  if (r.ok) {
+                    const mat = await r.json();
+                    lesson.materials = mat;
+                  } else {
+                    lesson.materials = lesson.materials || {};
+                  }
+                } catch(e){
+                  lesson.materials = lesson.materials || {};
+                }
+              }
+            });
+          } else {
+            m.lessons = [];
+          }
+        });
+
+      } catch (e) {
+        console.error('fetchFullCourse', e);
+        this.course = null;
+        this.modules = [];
+      }
+    },
+
+    get modulesSorted() {
+      return this.modules;
+    },
+
+    // модуль считается locked если его order > order текущего current_module_id
+    moduleLocked(module){
+      if (!this.progress) return true;
+      if (!this.progress.current_module_id) {
+        // считаем доступным только первый модуль
+        return module.order !== 1;
+      }
+      const current = this.modules.find(m => m.id === this.progress.current_module_id);
+      if (!current) return module.order !== 1;
+      return module.order > current.order;
+    },
+
+    lessonStatus(lesson){
+      if (!this.progress) return 'locked';
+      if (Array.isArray(this.progress.completed_lessons) && this.progress.completed_lessons.includes(lesson.id)) return 'completed';
+      const module = this.modules.find(m => (m.lessons||[]).some(l => l.id === lesson.id));
+      if (!module) return 'locked';
+      if (!this.moduleLocked(module)) return 'available';
+      return 'locked';
+    },
+
+    isLessonAvailable(lesson){
+      return this.lessonStatus(lesson) === 'available';
+    },
+
+    getLessonCardClass(lesson){
+      const st = this.lessonStatus(lesson);
+      if (st === 'completed') return 'border-green-200 bg-green-50';
+      if (st === 'available') return 'border-yellow-200 bg-yellow-50';
+      return 'border-gray-200 bg-gray-50';
+    },
+
+    getLessonBadgeClass(lesson){
+      const st = this.lessonStatus(lesson);
+      if (st === 'completed') return 'bg-green-100 text-green-800';
+      if (st === 'available') return 'bg-yellow-100 text-yellow-800';
+      return 'bg-gray-100 text-gray-600';
+    },
+
+    lessonStatusText(lesson){
+      const st = this.lessonStatus(lesson);
+      if (st === 'completed') return 'Завершён';
+      if (st === 'available') return 'Доступен';
+      return 'Заблокирован';
+    },
+
+    moduleProgressPercent(module){
+      const lessonIds = (module.lessons || []).map(l=>l.id);
+      if (lessonIds.length === 0) return 0;
+      const completed = (this.progress?.completed_lessons || []).filter(id => lessonIds.includes(id)).length;
+      return Math.round((completed / lessonIds.length) * 100);
+    },
+
+    calculateTotalProgress(){
+      if (!this.progress || !this.modules.length) return 0;
+      
+      let totalLessons = 0;
+      let completedLessons = 0;
+      
+      this.modules.forEach(module => {
+        const lessonIds = (module.lessons || []).map(l => l.id);
+        totalLessons += lessonIds.length;
+        completedLessons += (this.progress.completed_lessons || []).filter(id => lessonIds.includes(id)).length;
+      });
+      
+      if (totalLessons === 0) return 0;
+      return Math.round((completedLessons / totalLessons) * 100);
+    },
+
+    onFileSelect(event) {
+      const file = event.target.files[0];
+      if (file) {
+        // Проверка размера файла (50 МБ)
+        const maxSize = 50 * 1024 * 1024;
+        if (file.size > maxSize) {
+          alert('Файл слишком большой. Максимальный размер: 50 МБ');
+          event.target.value = '';
+          return;
+        }
+        
+        // Проверка типа файла
+        const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                            'application/zip', 'application/x-zip-compressed'];
+        const fileExtension = file.name.split('.').pop().toLowerCase();
+        const allowedExtensions = ['pdf', 'docx', 'zip'];
+        
+        if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+          alert('Неподдерживаемый формат файла. Разрешены: PDF, DOCX, ZIP');
+          event.target.value = '';
+          return;
+        }
+        
+        this.submitModal.file = file;
+      }
+    },
+
+    openSubmitModal(lesson){
+      this.submitModal.lesson = lesson;
+      this.submitModal.file = null;
+      this.submitModal.open = true;
+    },
+
+    closeSubmitModal(){
+      this.submitModal.open = false;
+      this.submitModal.lesson = null;
+      this.submitModal.file = null;
+    },
+
+    async submitAnswer(){
+      try {
+        const lesson = this.submitModal.lesson;
+        if (!lesson) return alert('Урок не выбран');
+        
+        if (!this.submitModal.file) return alert('Выберите файл');
+        if (!this.progress || !this.progress.id) throw new Error('Прогресс не найден');
+
+        // POST /api/user-course-progress/{progress_id}/lessons/{lesson_id}/submission
+        const url = `${this.API_BASE}/api/user-course-progress/${this.progress.id}/lessons/${lesson.id}/submission`;
+        const fd = new FormData();
+        fd.append('file', this.submitModal.file);
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {},
+          body: fd
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || 'Ошибка отправки');
+        }
+        
+        const result = await res.json();
+        // Сохраняем статус локально
+        this.submissions[lesson.id] = result;
+        
+        alert('Ответ успешно отправлен!');
+        this.closeSubmitModal();
+        
+      } catch (e) {
+        console.error('submitAnswer', e);
+        alert('Не удалось отправить: ' + (e.message || 'Ошибка'));
+      }
+    },
+
+    logout(){
+      localStorage.removeItem('userSession');
+      window.location.href = '../index.html';
+    }
+  };
+}
+</script>
+
+</body>
+</html>

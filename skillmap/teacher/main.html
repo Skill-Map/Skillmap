@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Панель преподавателя — Skillmap</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-50" x-data="teacherApp()" x-init="init()">
+
+  <!-- Header -->
+  <header class="bg-white border-b shadow-sm">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a href="/dashboard" class="font-bold text-lg text-gray-900">Skillmap</a>
+        <nav class="hidden md:flex gap-4 text-sm text-gray-600">
+          <a href="/dashboard">Дашборд</a>
+          <a href="/courses">Курсы</a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-4">
+        <!-- безопасно показываем имя -->
+        <div class="text-sm text-gray-700" x-text="teacher && teacher.name ? teacher.name : ''"></div>
+        <button @click="logout()" class="px-3 py-2 border rounded text-[color:var(--primary)]">Выйти</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto p-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Статистика -->
+      <div class="bg-white p-4 rounded-xl shadow-sm">
+        <h3 class="font-semibold text-lg">Статистика</h3>
+        <div class="mt-4 space-y-3 text-sm">
+          <div>Студентов: <span class="font-semibold" x-text="stats.students_count"></span></div>
+          <div>Курсов (у студентов): <span class="font-semibold" x-text="stats.courses_count"></span></div>
+          <div>Средний прогресс: <span class="font-semibold" x-text="stats.avg_progress + '%'"></span></div>
+        </div>
+      </div>
+
+      <!-- Список студентов -->
+      <div class="bg-white p-4 rounded-xl shadow-sm lg:col-span-2">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold text-lg">Мои студенты</h3>
+          <div class="text-sm text-gray-500">Кол-во: <span x-text="students.length"></span></div>
+        </div>
+
+        <div class="mt-4">
+          <input type="text" x-model="filter" placeholder="Поиск студента..." class="w-full px-3 py-2 border rounded-lg" />
+        </div>
+
+        <div class="mt-4 space-y-3">
+          <template x-for="s in filteredStudents" :key="s.id">
+            <div class="flex items-center justify-between border rounded-lg p-3">
+              <div>
+                <div class="font-medium" x-text="s.name"></div>
+                <div class="text-xs text-gray-500" x-text="s.email"></div>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="text-sm text-gray-600">Курсов: <span class="font-semibold" x-text="s.course_count"></span></div>
+                <div class="text-sm text-gray-600">Прогресс: <span class="font-semibold" x-text="s.avg_progress + '%'"></span></div>
+                <button @click="selectStudent(s)" class="px-3 py-1 border rounded text-sm">Открыть</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Панель выбранного студента: показываем только если selectedStudent не null -->
+    <div class="mt-6" x-show="selectedStudent != null">
+      <div class="bg-white p-4 rounded-xl shadow-sm">
+        <div class="flex items-center justify-between">
+          <div>
+            <!-- безопасный вывод: если selectedStudent отсутствует, выведется пустая строка -->
+            <h3 class="font-semibold text-lg" x-text="selectedStudent ? selectedStudent.name : ''"></h3>
+            <div class="text-xs text-gray-500" x-text="selectedStudent ? selectedStudent.email : ''"></div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="openCreateLesson()" class="px-4 py-2 bg-blue-600 text-white rounded">Добавить урок</button>
+            <button @click="loadAssignments(selectedStudent.id)" class="px-4 py-2 border rounded">Показать назначения</button>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <h4 class="font-medium">Назначенные уроки</h4>
+          <div class="mt-3 space-y-2">
+            <template x-for="a in assignments" :key="a.id">
+              <div class="border rounded p-3 flex items-start justify-between">
+                <div>
+                  <div class="font-semibold" x-text="a.lesson_title || ('Урок: ' + a.lesson_id)"></div>
+                  <div class="text-xs text-gray-500">Статус: <span x-text="a.status"></span></div>
+                  <div class="text-xs text-gray-500" x-text="a.note || ''"></div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <a :href="a.pptx_url" target="_blank" class="text-xs px-3 py-1 bg-blue-600 text-white rounded" x-show="a.pptx_url">PPTX</a>
+                  <a :href="a.homework_url" target="_blank" class="text-xs px-3 py-1 bg-purple-600 text-white rounded" x-show="a.homework_url">DOCX</a>
+                </div>
+              </div>
+            </template>
+            <div x-show="assignments.length === 0" class="text-sm text-gray-500">Пока назначений нет.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- МОДАЛ: Создать урок (добавить в модуль и сразу назначить студенту) -->
+  <div x-show="createLessonModal.open" x-cloak class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl w-full max-w-2xl p-6">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Создать урок и назначить студенту</h3>
+        <button @click="closeCreateLesson()" class="text-gray-400">✕</button>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm">Курс</label>
+          <select x-model="form.course_id" class="w-full border rounded px-3 py-2" @change="loadModulesForCourse()">
+            <option value="">Выберите курс</option>
+            <template x-for="c in courses" :key="c.id">
+              <option :value="c.id" x-text="c.name"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm">Модуль</label>
+          <select x-model="form.module_id" class="w-full border rounded px-3 py-2">
+            <option value="">Выберите модуль</option>
+            <template x-for="m in modules" :key="m.id">
+              <option :value="m.id" x-text="m.title"></option>
+            </template>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-sm">Порядок</label>
+          <input type="number" x-model="form.order" class="w-full border rounded px-3 py-2" />
+        </div>
+        <div>
+          <label class="text-sm">Заголовок урока</label>
+          <input type="text" x-model="form.title" class="w-full border rounded px-3 py-2" />
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="text-sm">Описание</label>
+          <textarea x-model="form.description" class="w-full border rounded px-3 py-2"></textarea>
+        </div>
+
+        <div>
+          <label class="text-sm">Презентация (.pptx)</label>
+          <input type="file" id="pptxFile" class="w-full" />
+        </div>
+        <div>
+          <label class="text-sm">Домашка (.docx)</label>
+          <input type="file" id="homeworkFile" class="w-full" />
+        </div>
+      </div>
+
+      <div class="mt-4 flex justify-end gap-3">
+        <button @click="closeCreateLesson()" class="px-4 py-2 border rounded">Отмена</button>
+        <button @click="createLessonAndAssign()" class="px-4 py-2 bg-blue-600 text-white rounded">Создать и назначить</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+function teacherApp(){
+  // <- Укажи здесь URL бэкенда. Если backend слушает на 8082, не забудь поставить http://localhost:8082
+  const API_BASE = 'http://localhost:8082';
+
+  return {
+    teacher: { name: '' },
+    stats: { students_count: 0, courses_count: 0, avg_progress: 0 },
+    students: [],
+    filter: '',
+    selectedStudent: null,
+    assignments: [],
+    courses: [],
+    modules: [],
+    createLessonModal: { open: false },
+    form: { course_id: '', module_id: '', order: 1, title: '', description: '' },
+
+    async init(){
+      await this.loadDashboard();
+    },
+
+    async loadDashboard(){
+      try {
+        const token = localStorage.getItem('accessToken') || '';
+        const res = await fetch(`${API_BASE}/api/teacher/dashboard`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+          }
+        });
+        if (!res.ok) {
+          // подсказка: 401/403/404 -> проверь backend, путь и CORS
+          throw new Error('Ошибка загрузки: ' + res.status);
+        }
+        const data = await res.json();
+        this.teacher = data.teacher || { name: '' };
+        this.students = data.students || [];
+        this.courses = data.courses || [];
+        this.stats.students_count = this.students.length;
+        this.stats.courses_count = this.courses.length;
+        const avg = this.students.reduce((acc, s) => acc + (s.avg_progress || 0), 0) / (this.students.length || 1);
+        this.stats.avg_progress = Math.round(avg);
+      } catch (e) {
+        console.error(e);
+        // Показываем одно аккуратное сообщение, не дубля alert'ов
+        alert('Не удалось загрузить данные панели. Проверьте, запущен ли backend и правильный ли API_BASE.');
+      }
+    },
+
+    get filteredStudents(){
+      if (!this.filter) return this.students;
+      return this.students.filter(s => (s.name || '').toLowerCase().includes(this.filter.toLowerCase()) || (s.email || '').toLowerCase().includes(this.filter.toLowerCase()));
+    },
+
+    selectStudent(s){
+      this.selectedStudent = s;
+      this.assignments = [];
+    },
+
+    async loadAssignments(userId){
+      try {
+        const token = localStorage.getItem('accessToken') || '';
+        // Важно: роутер assignments использует /api/teacher/assignments/user/{user_id}
+        const res = await fetch(`${API_BASE}/api/teacher/assignments/user/${encodeURIComponent(userId)}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+          }
+        });
+        if (!res.ok) throw new Error('Ошибка загрузки назначений: ' + res.status);
+        const data = await res.json();
+
+        // Пополнить lesson_title/urls если возможно (опционально)
+        for (let a of data) {
+          a.lesson_title = a.lesson_title || null;
+          a.pptx_url = a.pptx_url || null;
+          a.homework_url = a.homework_url || null;
+        }
+        this.assignments = data;
+      } catch (e) {
+        console.error(e);
+        alert('Не удалось загрузить назначения. Проверьте API и CORS.');
+      }
+    },
+
+    openCreateLesson(){
+      if (!this.selectedStudent) return alert('Выберите студента');
+      this.createLessonModal.open = true;
+      if (!this.courses || this.courses.length === 0) this.loadDashboard();
+    },
+
+    closeCreateLesson(){
+      this.createLessonModal.open = false;
+      this.form = { course_id: '', module_id: '', order: 1, title: '', description: '' };
+      this.modules = [];
+      const pf = document.getElementById('pptxFile'); if (pf) pf.value = null;
+      const hf = document.getElementById('homeworkFile'); if (hf) hf.value = null;
+    },
+
+    async loadModulesForCourse(){
+      try {
+        if (!this.form.course_id) return;
+        const res = await fetch(`${API_BASE}/api/courses/${this.form.course_id}/modules`);
+        if (!res.ok) throw new Error('modules fetch failed');
+        const mods = await res.json();
+        this.modules = mods;
+      } catch (e) {
+        console.warn(e);
+        this.modules = [];
+      }
+    },
+
+    async createLessonAndAssign(){
+      try {
+        if (!this.form.module_id) return alert('Выберите модуль');
+        if (!this.form.title) return alert('Введите заголовок урока');
+
+        const pptxInput = document.getElementById('pptxFile');
+        const hwInput = document.getElementById('homeworkFile');
+
+        const formData = new FormData();
+        formData.append('order', String(this.form.order));
+        formData.append('title', this.form.title);
+        if (this.form.description) formData.append('description', this.form.description);
+        if (pptxInput && pptxInput.files[0]) formData.append('pptx_file', pptxInput.files[0]);
+        if (hwInput && hwInput.files[0]) formData.append('homework_file', hwInput.files[0]);
+
+        const token = localStorage.getItem('accessToken') || '';
+        const url = `${API_BASE}/api/teacher/courses/${this.form.course_id}/modules/${this.form.module_id}/lessons`;
+        const res = await fetch(url, { method: 'POST', body: formData, headers: (token ? { 'Authorization': 'Bearer ' + token } : {}) });
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(t || 'Ошибка создания урока');
+        }
+        const lesson = await res.json();
+
+        const assignRes = await fetch(`${API_BASE}/api/teacher/assignments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': 'Bearer ' + token } : {}) },
+          body: JSON.stringify({ user_id: this.selectedStudent.id, lesson_id: lesson.id })
+        });
+        if (!assignRes.ok) throw new Error('Ошибка назначения урока');
+        alert('Урок создан и назначен студенту');
+        this.closeCreateLesson();
+        this.loadAssignments(this.selectedStudent.id);
+      } catch (e) {
+        console.error(e);
+        alert('Не удалось создать/назначить урок: ' + (e.message || 'Ошибка'));
+      }
+    },
+
+    logout(){
+        localStorage.removeItem('accessToken');
+        window.location.href = '/skillmap/index.html';
+    }
+  }
+}
+</script>
+
+</body>
+</html>

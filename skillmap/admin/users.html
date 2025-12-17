@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление пользователями - Skillmap Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --color-primary: #1A535C;
+            --color-secondary: #F2C14E;
+            --color-admin: #7C3AED;
+        }
+        .admin-bg { background-color: var(--color-admin); }
+        .admin-text { color: var(--color-admin); }
+        .admin-border { border-color: var(--color-admin); }
+        .user-table tr:hover { background-color: rgba(124, 58, 237, 0.05); }
+        .role-badge-student { background-color: rgba(14, 165, 233, 0.1); color: #0EA5E9; }
+        .role-badge-teacher { background-color: rgba(16, 185, 129, 0.1); color: #10B981; }
+        .role-badge-admin { background-color: rgba(124, 58, 237, 0.1); color: #7C3AED; }
+        .role-badge-moderator { background-color: rgba(245, 158, 11, 0.1); color: #F59E0B; }
+        .status-active { background-color: rgba(16, 185, 129, 0.1); color: #10B981; }
+        .status-inactive { background-color: rgba(239, 68, 68, 0.1); color: #EF4444; }
+        .status-suspended { background-color: rgba(245, 158, 11, 0.1); color: #F59E0B; }
+        .bulk-actions { transition: all 0.3s ease; }
+        .bulk-actions.active { transform: translateY(0); opacity: 1; }
+        [x-cloak] { display: none !important; }
+    </style>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="antialiased bg-gray-50" x-data="usersManagement()" x-init="init()">
+    <!-- Шапка -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <a href="dashboard.html" class="flex items-center space-x-3">
+                        <div class="admin-bg p-2 rounded-lg">
+                            <img src="../images/logo.png" alt="Skillmap Logo" class="h-6 w-6">
+                        </div>
+                        <span class="text-xl font-bold admin-text">Skillmap Admin</span>
+                    </a>
+                    <nav class="ml-10 flex space-x-6">
+                        <a href="dashboard.html" class="text-gray-600 hover:admin-text">Дашборд</a>
+                        <a href="users.html" class="admin-text font-semibold">Пользователи</a>
+                        <a href="#" class="text-gray-600 hover:admin-text">Контент</a>
+                        <a href="#" class="text-gray-600 hover:admin-text">Настройки</a>
+                    </nav>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700" x-text="user.name"></span>
+                    <button @click="logout()" class="px-4 py-2 text-sm font-semibold rounded-lg admin-text border admin-border hover:admin-bg hover:text-white transition">
+                        Выйти
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="p-6">
+        <div class="max-w-7xl mx-auto">
+            <!-- Заголовок и действия -->
+            <div class="mb-8">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">Управление пользователями</h1>
+                        <p class="text-gray-600 mt-2">Управление всеми пользователями системы</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button @click="showImportModal = true" 
+                                class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+                            <i class="fas fa-upload mr-2"></i>Импорт
+                        </button>
+                        <button @click="showAddUserModal = true" 
+                                class="px-4 py-2 admin-bg text-white rounded-lg hover:bg-opacity-90 transition font-medium">
+                            <i class="fas fa-plus mr-2"></i>Добавить пользователя
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Фильтры и поиск -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div class="md:col-span-2">
+                            <div class="relative">
+                                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                                <input type="text" x-model="searchQuery" 
+                                       placeholder="Поиск по имени, email или ID..."
+                                       class="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                            </div>
+                        </div>
+                        <select x-model="filterRole" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                            <option value="">Все роли</option>
+                            <option value="student">Студент</option>
+                            <option value="teacher">Преподаватель</option>
+                            <option value="admin">Администратор</option>
+                            <option value="moderator">Модератор</option>
+                        </select>
+                        <select x-model="filterStatus" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                            <option value="">Все статусы</option>
+                            <option value="active">Активные</option>
+                            <option value="inactive">Неактивные</option>
+                            <option value="suspended">Заблокированные</option>
+                        </select>
+                        <select x-model="itemsPerPage" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                            <option value="10">10 на странице</option>
+                            <option value="25">25 на странице</option>
+                            <option value="50">50 на странице</option>
+                            <option value="100">100 на странице</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Статистика -->
+                    <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="text-center p-3 bg-blue-50 rounded-lg">
+                            <p class="text-2xl font-bold text-blue-600" x-text="stats.total.toLocaleString()"></p>
+                            <p class="text-sm text-gray-600">Всего пользователей</p>
+                        </div>
+                        <div class="text-center p-3 bg-green-50 rounded-lg">
+                            <p class="text-2xl font-bold text-green-600" x-text="stats.active.toLocaleString()"></p>
+                            <p class="text-sm text-gray-600">Активных</p>
+                        </div>
+                        <div class="text-center p-3 bg-yellow-50 rounded-lg">
+                            <p class="text-2xl font-bold text-yellow-600" x-text="stats.newToday"></p>
+                            <p class="text-sm text-gray-600">Новых сегодня</p>
+                        </div>
+                        <div class="text-center p-3 bg-red-50 rounded-lg">
+                            <p class="text-2xl font-bold text-red-600" x-text="stats.suspended"></p>
+                            <p class="text-sm text-gray-600">Заблокировано</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Массовые действия (показывается при выборе пользователей) -->
+            <div x-show="selectedUsers.length > 0" 
+                 class="bulk-actions fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white shadow-xl rounded-xl border p-4 z-10"
+                 :class="{ 'active': selectedUsers.length > 0 }"
+                 style="transform: translate(-50%, 100%); opacity: 0;">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <span class="font-medium text-gray-900">
+                            Выбрано: <span x-text="selectedUsers.length"></span> пользователей
+                        </span>
+                        <button @click="selectAllFiltered()" class="text-sm admin-text hover:underline">
+                            Выбрать все (<span x-text="filteredUsers.length"></span>)
+                        </button>
+                        <button @click="selectedUsers = []" class="text-sm text-gray-600 hover:text-gray-900">
+                            Снять выделение
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <select x-model="bulkAction" class="px-3 py-2 border rounded-lg text-sm">
+                            <option value="">Массовые действия</option>
+                            <option value="activate">Активировать</option>
+                            <option value="suspend">Заблокировать</option>
+                            <option value="change_role">Изменить роль</option>
+                            <option value="delete">Удалить</option>
+                        </select>
+                        <button @click="applyBulkAction()" 
+                                class="px-4 py-2 admin-bg text-white rounded-lg hover:bg-opacity-90 transition text-sm font-medium">
+                            Применить
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Таблица пользователей -->
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <input type="checkbox" 
+                                           x-model="allSelected"
+                                           @click="toggleSelectAll()"
+                                           class="rounded border-gray-300 text-admin focus:ring-admin">
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Пользователь
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Роль
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Статус
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Дата регистрации
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Последняя активность
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Действия
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200 user-table">
+                            <template x-for="user in paginatedUsers" :key="user.id">
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <input type="checkbox" 
+                                               :value="user.id"
+                                               x-model="selectedUsers"
+                                               class="rounded border-gray-300 text-admin focus:ring-admin">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0 h-10 w-10">
+                                                <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                                    <span class="font-medium text-gray-700" x-text="user.initials"></span>
+                                                </div>
+                                            </div>
+                                            <div class="ml-4">
+                                                <div class="text-sm font-medium text-gray-900" x-text="user.name"></div>
+                                                <div class="text-sm text-gray-500" x-text="user.email"></div>
+                                                <div class="text-xs text-gray-400" x-text="`ID: ${user.id}`"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 text-xs rounded-full" 
+                                              :class="getRoleClass(user.role)"
+                                              x-text="getRoleName(user.role)"></span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 text-xs rounded-full" 
+                                              :class="getStatusClass(user.status)"
+                                              x-text="getStatusName(user.status)"></span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <span x-text="user.createdAt"></span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <span x-text="user.lastActivity"></span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <div class="flex items-center space-x-2">
+                                            <button @click="viewUser(user)" 
+                                                    class="text-admin hover:text-admin/80" title="Просмотр">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button @click="editUser(user)" 
+                                                    class="text-blue-600 hover:text-blue-800" title="Редактировать">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button @click="showActionsMenu(user)" 
+                                                    class="text-gray-600 hover:text-gray-900 relative" title="Другие действия">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Пагинация -->
+                <div class="px-6 py-4 border-t">
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm text-gray-500">
+                            Показано <span x-text="((currentPage - 1) * itemsPerPage) + 1"></span>-
+                            <span x-text="Math.min(currentPage * itemsPerPage, filteredUsers.length)"></span>
+                            из <span x-text="filteredUsers.length"></span> пользователей
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button @click="prevPage()" :disabled="currentPage === 1" 
+                                    class="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <template x-for="page in visiblePages" :key="page">
+                                <button @click="currentPage = page" 
+                                        :class="currentPage === page ? 'admin-bg text-white' : 'text-gray-700 hover:bg-gray-100'"
+                                        class="w-8 h-8 rounded-lg text-sm">
+                                    <span x-text="page"></span>
+                                </button>
+                            </template>
+                            <button @click="nextPage()" :disabled="currentPage === totalPages" 
+                                    class="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Экспорт данных -->
+            <div class="mt-6 bg-white p-4 rounded-xl shadow-sm border">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="font-medium text-gray-900">Экспорт данных</h3>
+                        <p class="text-sm text-gray-500">Экспорт пользователей в различных форматах</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button @click="exportData('csv')" class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                            <i class="fas fa-file-csv mr-2"></i>CSV
+                        </button>
+                        <button @click="exportData('json')" class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                            <i class="fas fa-code mr-2"></i>JSON
+                        </button>
+                        <button @click="exportData('pdf')" class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                            <i class="fas fa-file-pdf mr-2"></i>PDF
+                        </button>
+                        <button @click="exportData('excel')" class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                            <i class="fas fa-file-excel mr-2"></i>Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Модальное окно добавления пользователя -->
+    <div x-show="showAddUserModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-gray-900">Добавить нового пользователя</h2>
+                    <button @click="showAddUserModal = false" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <form @submit.prevent="addUser()" class="space-y-6">
+                    <!-- Основная информация -->
+                    <div>
+                        <h3 class="font-medium text-gray-900 mb-4">Основная информация</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Имя</label>
+                                <input type="text" x-model="newUser.firstName" required
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Фамилия</label>
+                                <input type="text" x-model="newUser.lastName" required
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input type="email" x-model="newUser.email" required
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Телефон</label>
+                                <input type="tel" x-model="newUser.phone"
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Пароль и роль -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="font-medium text-gray-900 mb-4">Пароль</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Пароль</label>
+                                    <input type="password" x-model="newUser.password" required
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Подтверждение пароля</label>
+                                    <input type="password" x-model="newUser.confirmPassword" required
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3 class="font-medium text-gray-900 mb-4">Роль и статус</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Роль</label>
+                                    <select x-model="newUser.role" 
+                                            class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                                        <option value="student">Студент</option>
+                                        <option value="teacher">Преподаватель</option>
+                                        <option value="moderator">Модератор</option>
+                                        <option value="admin">Администратор</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Статус</label>
+                                    <select x-model="newUser.status" 
+                                            class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                                        <option value="active">Активный</option>
+                                        <option value="inactive">Неактивный</option>
+                                        <option value="suspended">Заблокированный</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Дополнительная информация -->
+                    <div>
+                        <h3 class="font-medium text-gray-900 mb-4">Дополнительная информация</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Город</label>
+                                <input type="text" x-model="newUser.city"
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Комментарий</label>
+                                <textarea x-model="newUser.notes" rows="3"
+                                          class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin"
+                                          placeholder="Дополнительная информация о пользователе..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Кнопки действий -->
+                    <div class="pt-6 border-t">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <button type="submit" 
+                                        class="px-6 py-3 admin-bg text-white rounded-lg hover:bg-opacity-90 transition font-medium">
+                                    Создать пользователя
+                                </button>
+                                <button type="button" @click="showAddUserModal = false"
+                                        class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+                                    Отмена
+                                </button>
+                            </div>
+                            <label class="flex items-center">
+                                <input type="checkbox" x-model="newUser.sendWelcomeEmail" class="mr-2">
+                                <span class="text-sm text-gray-600">Отправить приветственное письмо</span>
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования пользователя -->
+    <div x-show="editingUser" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                            <span class="font-bold text-gray-700" x-text="editingUser.initials"></span>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-900" x-text="editingUser.name"></h2>
+                            <p class="text-gray-500" x-text="editingUser.email"></p>
+                        </div>
+                    </div>
+                    <button @click="editingUser = null" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <!-- Вкладки -->
+                <div class="border-b mb-6">
+                    <div class="flex space-x-8">
+                        <button @click="activeTab = 'info'" 
+                                :class="activeTab === 'info' ? 'border-b-2 border-admin text-admin' : 'text-gray-500'"
+                                class="py-2 font-medium">
+                            Информация
+                        </button>
+                        <button @click="activeTab = 'security'" 
+                                :class="activeTab === 'security' ? 'border-b-2 border-admin text-admin' : 'text-gray-500'"
+                                class="py-2 font-medium">
+                            Безопасность
+                        </button>
+                        <button @click="activeTab = 'activity'" 
+                                :class="activeTab === 'activity' ? 'border-b-2 border-admin text-admin' : 'text-gray-500'"
+                                class="py-2 font-medium">
+                            Активность
+                        </button>
+                        <button @click="activeTab = 'notes'" 
+                                :class="activeTab === 'notes' ? 'border-b-2 border-admin text-admin' : 'text-gray-500'"
+                                class="py-2 font-medium">
+                            Заметки
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Вкладка информации -->
+                <div x-show="activeTab === 'info'" class="space-y-6">
+                    <form @submit.prevent="saveUser()">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Имя</label>
+                                <input type="text" x-model="editingUser.firstName" required
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Фамилия</label>
+                                <input type="text" x-model="editingUser.lastName" required
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input type="email" x-model="editingUser.email" required
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Телефон</label>
+                                <input type="tel" x-model="editingUser.phone"
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Роль</label>
+                                <select x-model="editingUser.role" 
+                                        class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                                    <option value="student">Студент</option>
+                                    <option value="teacher">Преподаватель</option>
+                                    <option value="moderator">Модератор</option>
+                                    <option value="admin">Администратор</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Статус</label>
+                                <select x-model="editingUser.status" 
+                                        class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin">
+                                    <option value="active">Активный</option>
+                                    <option value="inactive">Неактивный</option>
+                                    <option value="suspended">Заблокированный</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-8 pt-6 border-t">
+                            <div class="flex items-center justify-between">
+                                <button type="submit" 
+                                        class="px-6 py-3 admin-bg text-white rounded-lg hover:bg-opacity-90 transition font-medium">
+                                    Сохранить изменения
+                                </button>
+                                <button type="button" @click="editingUser = null"
+                                        class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+                                    Отмена
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Вкладка безопасности -->
+                <div x-show="activeTab === 'security'" class="space-y-6">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-medium text-gray-900 mb-2">Сброс пароля</h3>
+                        <p class="text-sm text-gray-600 mb-4">Отправить пользователю ссылку для сброса пароля</p>
+                        <button @click="resetPassword(editingUser)" 
+                                class="px-4 py-2 admin-bg text-white rounded-lg hover:bg-opacity-90 transition">
+                            Отправить ссылку для сброса
+                        </button>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-medium text-gray-900 mb-2">Сессии</h3>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">Активные сессии:</span>
+                                <span class="font-medium" x-text="editingUser.activeSessions"></span>
+                            </div>
+                            <button @click="logoutAllSessions(editingUser)" 
+                                    class="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition">
+                                Завершить все сессии
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Вкладка активности -->
+                <div x-show="activeTab === 'activity'" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="p-4 border rounded-lg">
+                            <p class="text-sm text-gray-600">Дата регистрации</p>
+                            <p class="font-medium" x-text="editingUser.createdAt"></p>
+                        </div>
+                        <div class="p-4 border rounded-lg">
+                            <p class="text-sm text-gray-600">Последняя активность</p>
+                            <p class="font-medium" x-text="editingUser.lastActivity"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 border rounded-lg">
+                        <h3 class="font-medium text-gray-900 mb-3">История действий</h3>
+                        <div class="space-y-3">
+                            <template x-for="activity in editingUser.activities" :key="activity.id">
+                                <div class="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded">
+                                    <div :class="`p-2 rounded-full ${activity.iconBg}`">
+                                        <i class="fas" :class="activity.icon"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-sm font-medium text-gray-900" x-text="activity.title"></p>
+                                        <p class="text-xs text-gray-500" x-text="activity.time"></p>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Вкладка заметок -->
+                <div x-show="activeTab === 'notes'" class="space-y-6">
+                    <div class="p-4 border rounded-lg">
+                        <h3 class="font-medium text-gray-900 mb-3">Заметки администратора</h3>
+                        <textarea x-model="editingUser.adminNotes" rows="4"
+                                  class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-admin"
+                                  placeholder="Добавьте заметки об этом пользователе..."></textarea>
+                        <div class="mt-4">
+                            <button @click="saveNotes(editingUser)" 
+                                    class="px-4 py-2 admin-bg text-white rounded-lg hover:bg-opacity-90 transition">
+                                Сохранить заметки
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно импорта -->
+    <div x-show="showImportModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div class="bg-white rounded-2xl max-w-md w-full">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-gray-900">Импорт пользователей</h2>
+                    <button @click="showImportModal = false" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                        <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+                        <p class="text-gray-600 mb-2">Перетащите CSV или Excel файл сюда</p>
+                        <p class="text-sm text-gray-500 mb-4">или</p>
+                        <input type="file" id="importFile" accept=".csv,.xlsx,.xls" class="hidden" @change="handleFileImport">
+                        <label for="importFile" class="px-4 py-2 admin-bg text-white rounded-lg hover:bg-opacity-90 transition cursor-pointer">
+                            Выберите файл
+                        </label>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-medium text-gray-900 mb-2">Требования к файлу</h4>
+                        <ul class="text-sm text-gray-600 space-y-1">
+                            <li><i class="fas fa-check text-green-500 mr-2"></i>Формат: CSV, Excel (.xlsx, .xls)</li>
+                            <li><i class="fas fa-check text-green-500 mr-2"></i>Обязательные поля: email, firstName, lastName</li>
+                            <li><i class="fas fa-check text-green-500 mr-2"></i>Поддерживаемые кодировки: UTF-8</li>
+                            <li><i class="fas fa-check text-green-500 mr-2"></i>Максимальный размер: 10MB</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="mt-6 pt-6 border-t">
+                    <button @click="downloadTemplate()" class="text-admin hover:underline">
+                        <i class="fas fa-download mr-2"></i>Скачать шаблон
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function usersManagement() {
+            return {
+                user: {
+                    name: 'Администратор Системы',
+                    email: 'admin@skillmap.ru'
+                },
+                searchQuery: '',
+                filterRole: '',
+                filterStatus: '',
+                itemsPerPage: 10,
+                currentPage: 1,
+                selectedUsers: [],
+                bulkAction: '',
+                showAddUserModal: false,
+                showImportModal: false,
+                editingUser: null,
+                activeTab: 'info',
+                
+                stats: {
+                    total: 1564,
+                    active: 1420,
+                    newToday: 24,
+                    suspended: 12
+                },
+                
+                newUser: {
+                    firstName: '',
+                    lastName: '',
+                    email: '',
+                    phone: '',
+                    password: '',
+                    confirmPassword: '',
+                    role: 'student',
+                    status: 'active',
+                    city: '',
+                    notes: '',
+                    sendWelcomeEmail: true
+                },
+                
+                users: [
+                    {
+                        id: 'USR001',
+                        firstName: 'Иван',
+                        lastName: 'Петров',
+                        email: 'ivan@example.com',
+                        phone: '+7 (999) 123-45-67',
+                        role: 'student',
+                        status: 'active',
+                        createdAt: '2024-01-15',
+                        lastActivity: '2 часа назад',
+                        city: 'Москва',
+                        activeSessions: 2,
+                        adminNotes: 'Активный студент, показывает хорошие результаты.',
+                        activities: [
+                            { id: 1, title: 'Зарегистрировался на платформе', time: '15 января 2024', icon: 'fa-user-plus', iconBg: 'bg-blue-100' },
+                            { id: 2, title: 'Выбрал трек Frontend-разработка', time: '16 января 2024', icon: 'fa-bullseye', iconBg: 'bg-green-100' },
+                            { id: 3, title: 'Завершил первый модуль', time: '20 января 2024', icon: 'fa-check-circle', iconBg: 'bg-purple-100' }
+                        ]
+                    },
+                    {
+                        id: 'USR002',
+                        firstName: 'Мария',
+                        lastName: 'Сидорова',
+                        email: 'maria@example.com',
+                        phone: '+7 (999) 987-65-43',
+                        role: 'teacher',
+                        status: 'active',
+                        createdAt: '2023-11-10',
+                        lastActivity: 'Вчера',
+                        city: 'Санкт-Петербург',
+                        activeSessions: 1,
+                        adminNotes: 'Опытный преподаватель, курирует 32 студента.',
+                        activities: [
+                            { id: 1, title: 'Назначена преподавателем', time: '10 ноября 2023', icon: 'fa-chalkboard-teacher', iconBg: 'bg-green-100' },
+                            { id: 2, title: 'Создала учебный материал', time: '15 ноября 2023', icon: 'fa-file-alt', iconBg: 'bg-blue-100' }
+                        ]
+                    },
+                    {
+                        id: 'USR003',
+                        firstName: 'Алексей',
+                        lastName: 'Иванов',
+                        email: 'alexey@example.com',
+                        phone: '+7 (999) 456-78-90',
+                        role: 'admin',
+                        status: 'active',
+                        createdAt: '2023-08-05',
+                        lastActivity: 'Сегодня',
+                        city: 'Москва',
+                        activeSessions: 3,
+                        adminNotes: 'Главный администратор системы.',
+                        activities: [
+                            { id: 1, title: 'Добавлен как администратор', time: '5 августа 2023', icon: 'fa-user-shield', iconBg: 'bg-purple-100' },
+                            { id: 2, title: 'Настроил параметры безопасности', time: '10 августа 2023', icon: 'fa-cog', iconBg: 'bg-yellow-100' }
+                        ]
+                    },
+                    {
+                        id: 'USR004',
+                        firstName: 'Елена',
+                        lastName: 'Кузнецова',
+                        email: 'elena@example.com',
+                        phone: '+7 (999) 111-22-33',
+                        role: 'moderator',
+                        status: 'active',
+                        createdAt: '2024-02-01',
+                        lastActivity: '5 дней назад',
+                        city: 'Екатеринбург',
+                        activeSessions: 0,
+                        adminNotes: 'Новый модератор, проходит обучение.',
+                        activities: [
+                            { id: 1, title: 'Назначена модератором', time: '1 февраля 2024', icon: 'fa-user-check', iconBg: 'bg-orange-100' }
+                        ]
+                    },
+                    {
+                        id: 'USR005',
+                        firstName: 'Дмитрий',
+                        lastName: 'Попов',
+                        email: 'dmitry@example.com',
+                        phone: '+7 (999) 444-55-66',
+                        role: 'student',
+                        status: 'suspended',
+                        createdAt: '2024-01-20',
+                        lastActivity: '2 недели назад',
+                        city: 'Новосибирск',
+                        activeSessions: 0,
+                        adminNotes: 'Заблокирован за нарушение правил.',
+                        activities: [
+                            { id: 1, title: 'Зарегистрировался на платформе', time: '20 января 2024', icon: 'fa-user-plus', iconBg: 'bg-blue-100' },
+                            { id: 2, title: 'Заблокирован за спам', time: '25 января 2024', icon: 'fa-ban', iconBg: 'bg-red-100' }
+                        ]
+                    }
+                ],
+                
+                init() {
+                    // Проверка авторизации и роли
+                    const session = localStorage.getItem('userSession');
+                    if (!session) {
+                        window.location.href = '../index.html';
+                        return;
+                    }
+                    
+                    const userData = JSON.parse(session);
+                    if (userData.role !== 'admin') {
+                        window.location.href = userData.role === 'teacher' ? '../teacher/dashboard.html' : '../student/dashboard.html';
+                        return;
+                    }
+                    
+                    this.user.email = userData.email;
+                    this.user.name = userData.name || 'Администратор';
+                    
+                    // Загрузка пользователей из localStorage
+                    const savedUsers = localStorage.getItem('adminUsers');
+                    if (savedUsers) {
+                        const parsed = JSON.parse(savedUsers);
+                        if (parsed.length > 0) {
+                            this.users = parsed;
+                            this.updateStats();
+                        }
+                    }
+                    
+                    // Инициализация начальных пользователей, если их нет
+                    if (this.users.length === 0) {
+                        this.generateSampleUsers();
+                    }
+                },
+                
+                generateSampleUsers() {
+                    // Генерация 50 случайных пользователей для демонстрации
+                    const roles = ['student', 'teacher', 'moderator', 'admin'];
+                    const statuses = ['active', 'inactive', 'suspended'];
+                    const cities = ['Москва', 'Санкт-Петербург', 'Екатеринбург', 'Новосибирск', 'Казань', 'Владивосток'];
+                    const firstNames = ['Александр', 'Анна', 'Дмитрий', 'Екатерина', 'Михаил', 'Ольга', 'Сергей', 'Татьяна', 'Павел', 'Юлия'];
+                    const lastNames = ['Иванов', 'Петрова', 'Сидоров', 'Кузнецова', 'Попов', 'Васильева', 'Смирнов', 'Морозова', 'Новиков', 'Федорова'];
+                    
+                    for (let i = 6; i <= 50; i++) {
+                        const role = roles[Math.floor(Math.random() * roles.length)];
+                        const status = statuses[Math.floor(Math.random() * statuses.length)];
+                        const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+                        const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+                        
+                        this.users.push({
+                            id: `USR${i.toString().padStart(3, '0')}`,
+                            firstName,
+                            lastName,
+                            email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${i}@example.com`,
+                            phone: `+7 (999) ${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 90 + 10)}-${Math.floor(Math.random() * 90 + 10)}`,
+                            role,
+                            status,
+                            createdAt: `2024-${Math.floor(Math.random() * 2) + 1}-${Math.floor(Math.random() * 28) + 1}`,
+                            lastActivity: `${Math.floor(Math.random() * 30)} дней назад`,
+                            city: cities[Math.floor(Math.random() * cities.length)],
+                            activeSessions: Math.floor(Math.random() * 3),
+                            adminNotes: '',
+                            activities: []
+                        });
+                    }
+                    
+                    localStorage.setItem('adminUsers', JSON.stringify(this.users));
+                    this.updateStats();
+                },
+                
+                get filteredUsers() {
+                    return this.users.filter(user => {
+                        const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
+                        const matchesSearch = this.searchQuery === '' ||
+                            fullName.includes(this.searchQuery.toLowerCase()) ||
+                            user.email.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                            user.id.toLowerCase().includes(this.searchQuery.toLowerCase());
+                        
+                        const matchesRole = this.filterRole === '' || user.role === this.filterRole;
+                        const matchesStatus = this.filterStatus === '' || user.status === this.filterStatus;
+                        
+                        return matchesSearch && matchesRole && matchesStatus;
+                    });
+                },
+                
+                get paginatedUsers() {
+                    const start = (this.currentPage - 1) * this.itemsPerPage;
+                    const end = start + this.itemsPerPage;
+                    return this.filteredUsers.slice(start, end).map(user => ({
+                        ...user,
+                        name: `${user.firstName} ${user.lastName}`,
+                        initials: `${user.firstName[0]}${user.lastName[0]}`
+                    }));
+                },
+                
+                get totalPages() {
+                    return Math.ceil(this.filteredUsers.length / this.itemsPerPage);
+                },
+                
+                get visiblePages() {
+                    const pages = [];
+                    const maxVisible = 5;
+                    let start = Math.max(1, this.currentPage - Math.floor(maxVisible / 2));
+                    let end = Math.min(this.totalPages, start + maxVisible - 1);
+                    
+                    if (end - start + 1 < maxVisible) {
+                        start = Math.max(1, end - maxVisible + 1);
+                    }
+                    
+                    for (let i = start; i <= end; i++) {
+                        pages.push(i);
+                    }
+                    
+                    return pages;
+                },
+                
+                get allSelected() {
+                    if (this.paginatedUsers.length === 0) return false;
+                    return this.paginatedUsers.every(user => this.selectedUsers.includes(user.id));
+                },
+                
+                updateStats() {
+                    this.stats.total = this.users.length;
+                    this.stats.active = this.users.filter(u => u.status === 'active').length;
+                    this.stats.suspended = this.users.filter(u => u.status === 'suspended').length;
+                    // Для демо: новые сегодня - случайное число
+                    this.stats.newToday = Math.floor(Math.random() * 30);
+                },
+                
+                getRoleName(role) {
+                    const roles = {
+                        'student': 'Студент',
+                        'teacher': 'Преподаватель',
+                        'admin': 'Администратор',
+                        'moderator': 'Модератор'
+                    };
+                    return roles[role] || role;
+                },
+                
+                getRoleClass(role) {
+                    const classes = {
+                        'student': 'role-badge-student',
+                        'teacher': 'role-badge-teacher',
+                        'admin': 'role-badge-admin',
+                        'moderator': 'role-badge-moderator'
+                    };
+                    return classes[role] || 'bg-gray-100 text-gray-800';
+                },
+                
+                getStatusName(status) {
+                    const statuses = {
+                        'active': 'Активный',
+                        'inactive': 'Неактивный',
+                        'suspended': 'Заблокирован'
+                    };
+                    return statuses[status] || status;
+                },
+                
+                getStatusClass(status) {
+                    const classes = {
+                        'active': 'status-active',
+                        'inactive': 'status-inactive',
+                        'suspended': 'status-suspended'
+                    };
+                    return classes[status] || 'bg-gray-100 text-gray-800';
+                },
+                
+                toggleSelectAll() {
+                    if (this.allSelected) {
+                        // Снимаем выделение со всех на текущей странице
+                        this.paginatedUsers.forEach(user => {
+                            const index = this.selectedUsers.indexOf(user.id);
+                            if (index > -1) {
+                                this.selectedUsers.splice(index, 1);
+                            }
+                        });
+                    } else {
+                        // Добавляем всех с текущей страницы
+                        this.paginatedUsers.forEach(user => {
+                            if (!this.selectedUsers.includes(user.id)) {
+                                this.selectedUsers.push(user.id);
+                            }
+                        });
+                    }
+                },
+                
+                selectAllFiltered() {
+                    this.selectedUsers = this.filteredUsers.map(user => user.id);
+                },
+                
+                prevPage() {
+                    if (this.currentPage > 1) {
+                        this.currentPage--;
+                        this.selectedUsers = []; // Сбрасываем выделение при смене страницы
+                    }
+                },
+                
+                nextPage() {
+                    if (this.currentPage < this.totalPages) {
+                        this.currentPage++;
+                        this.selectedUsers = []; // Сбрасываем выделение при смене страницы
+                    }
+                },
+                
+                viewUser(user) {
+                    this.editingUser = { ...user };
+                    this.activeTab = 'info';
+                },
+                
+                editUser(user) {
+                    this.editingUser = { ...user };
+                    this.activeTab = 'info';
+                },
+                
+                showActionsMenu(user) {
+                    // В реальном приложении здесь было бы выпадающее меню
+                    const action = prompt(`Выберите действие для ${user.firstName} ${user.lastName}:\n1 - Активировать\n2 - Заблокировать\n3 - Сменить роль\n4 - Сбросить пароль\n5 - Удалить`);
+                    
+                    switch(action) {
+                        case '1':
+                            this.activateUser(user);
+                            break;
+                        case '2':
+                            this.suspendUser(user);
+                            break;
+                        case '3':
+                            this.changeUserRole(user);
+                            break;
+                        case '4':
+                            this.resetPassword(user);
+                            break;
+                        case '5':
+                            this.deleteUser(user);
+                            break;
+                    }
+                },
+                
+                applyBulkAction() {
+                    if (!this.bulkAction || this.selectedUsers.length === 0) {
+                        alert('Выберите действие и пользователей');
+                        return;
+                    }
+                    
+                    const selectedCount = this.selectedUsers.length;
+                    
+                    if (confirm(`Применить действие "${this.bulkAction}" к ${selectedCount} пользователям?`)) {
+                        switch(this.bulkAction) {
+                            case 'activate':
+                                this.users.forEach(user => {
+                                    if (this.selectedUsers.includes(user.id)) {
+                                        user.status = 'active';
+                                    }
+                                });
+                                break;
+                            case 'suspend':
+                                this.users.forEach(user => {
+                                    if (this.selectedUsers.includes(user.id)) {
+                                        user.status = 'suspended';
+                                    }
+                                });
+                                break;
+                            case 'delete':
+                                if (confirm(`Удалить ${selectedCount} пользователей? Это действие нельзя отменить.`)) {
+                                    this.users = this.users.filter(user => !this.selectedUsers.includes(user.id));
+                                    this.selectedUsers = [];
+                                }
+                                break;
+                        }
+                        
+                        this.saveUsers();
+                        this.updateStats();
+                        this.bulkAction = '';
+                        alert(`Действие применено к ${selectedCount} пользователям`);
+                    }
+                },
+                
+                addUser() {
+                    if (this.newUser.password !== this.newUser.confirmPassword) {
+                        alert('Пароли не совпадают');
+                        return;
+                    }
+                    
+                    // Генерация ID для нового пользователя
+                    const maxId = Math.max(...this.users.map(u => parseInt(u.id.replace('USR', ''))));
+                    const newId = `USR${(maxId + 1).toString().padStart(3, '0')}`;
+                    
+                    const newUser = {
+                        id: newId,
+                        firstName: this.newUser.firstName,
+                        lastName: this.newUser.lastName,
+                        email: this.newUser.email,
+                        phone: this.newUser.phone,
+                        role: this.newUser.role,
+                        status: this.newUser.status,
+                        createdAt: new Date().toISOString().split('T')[0],
+                        lastActivity: 'Только что',
+                        city: this.newUser.city,
+                        activeSessions: 0,
+                        adminNotes: this.newUser.notes,
+                        activities: [
+                            { 
+                                id: 1, 
+                                title: 'Создан администратором', 
+                                time: 'Только что', 
+                                icon: 'fa-user-plus', 
+                                iconBg: 'bg-admin/20' 
+                            }
+                        ]
+                    };
+                    
+                    this.users.push(newUser);
+                    this.saveUsers();
+                    this.updateStats();
+                    
+                    // Сброс формы
+                    this.newUser = {
+                        firstName: '',
+                        lastName: '',
+                        email: '',
+                        phone: '',
+                        password: '',
+                        confirmPassword: '',
+                        role: 'student',
+                        status: 'active',
+                        city: '',
+                        notes: '',
+                        sendWelcomeEmail: true
+                    };
+                    
+                    this.showAddUserModal = false;
+                    alert('Пользователь успешно создан');
+                },
+                
+                saveUser() {
+                    const index = this.users.findIndex(u => u.id === this.editingUser.id);
+                    if (index !== -1) {
+                        this.users[index] = { ...this.editingUser };
+                        this.saveUsers();
+                        this.editingUser = null;
+                        alert('Изменения сохранены');
+                    }
+                },
+                
+                saveNotes(user) {
+                    const index = this.users.findIndex(u => u.id === user.id);
+                    if (index !== -1) {
+                        this.users[index].adminNotes = user.adminNotes;
+                        this.saveUsers();
+                        alert('Заметки сохранены');
+                    }
+                },
+                
+                activateUser(user) {
+                    user.status = 'active';
+                    this.saveUsers();
+                    alert(`Пользователь ${user.firstName} ${user.lastName} активирован`);
+                },
+                
+                suspendUser(user) {
+                    user.status = 'suspended';
+                    this.saveUsers();
+                    alert(`Пользователь ${user.firstName} ${user.lastName} заблокирован`);
+                },
+                
+                changeUserRole(user) {
+                    const newRole = prompt('Введите новую роль (student, teacher, moderator, admin):', user.role);
+                    if (newRole && ['student', 'teacher', 'moderator', 'admin'].includes(newRole)) {
+                        user.role = newRole;
+                        this.saveUsers();
+                        alert(`Роль пользователя изменена на ${this.getRoleName(newRole)}`);
+                    }
+                },
+                
+                resetPassword(user) {
+                    alert(`Ссылка для сброса пароля отправлена на ${user.email}`);
+                    // В реальном приложении здесь был бы вызов API
+                },
+                
+                logoutAllSessions(user) {
+                    user.activeSessions = 0;
+                    this.saveUsers();
+                    alert(`Все сессии пользователя ${user.firstName} ${user.lastName} завершены`);
+                },
+                
+                deleteUser(user) {
+                    if (confirm(`Удалить пользователя ${user.firstName} ${user.lastName}? Это действие нельзя отменить.`)) {
+                        this.users = this.users.filter(u => u.id !== user.id);
+                        this.saveUsers();
+                        this.updateStats();
+                        alert('Пользователь удален');
+                    }
+                },
+                
+                exportData(format) {
+                    const data = this.filteredUsers;
+                    let content, mimeType, fileName;
+                    
+                    switch(format) {
+                        case 'csv':
+                            content = this.convertToCSV(data);
+                            mimeType = 'text/csv';
+                            fileName = 'users.csv';
+                            break;
+                        case 'json':
+                            content = JSON.stringify(data, null, 2);
+                            mimeType = 'application/json';
+                            fileName = 'users.json';
+                            break;
+                        default:
+                            alert(`Экспорт в ${format} будет доступен в полной версии`);
+                            return;
+                    }
+                    
+                    const blob = new Blob([content], { type: mimeType });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    alert(`Данные экспортированы в ${fileName}`);
+                },
+                
+                convertToCSV(data) {
+                    const headers = ['ID', 'Имя', 'Фамилия', 'Email', 'Телефон', 'Роль', 'Статус', 'Дата регистрации', 'Город'];
+                    const rows = data.map(user => [
+                        user.id,
+                        user.firstName,
+                        user.lastName,
+                        user.email,
+                        user.phone,
+                        this.getRoleName(user.role),
+                        this.getStatusName(user.status),
+                        user.createdAt,
+                        user.city
+                    ]);
+                    
+                    return [
+                        headers.join(','),
+                        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+                    ].join('\n');
+                },
+                
+                handleFileImport(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        alert(`Файл "${file.name}" выбран для импорта. В реальном приложении здесь была бы обработка файла.`);
+                        this.showImportModal = false;
+                    }
+                },
+                
+                downloadTemplate() {
+                    const template = `ID,Имя,Фамилия,Email,Телефон,Роль,Статус,Город
+USR001,Иван,Петров,ivan@example.com,+7 (999) 123-45-67,student,active,Москва
+USR002,Мария,Сидорова,maria@example.com,+7 (999) 987-65-43,teacher,active,Санкт-Петербург`;
+                    
+                    const blob = new Blob([template], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'users_template.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                },
+                
+                saveUsers() {
+                    localStorage.setItem('adminUsers', JSON.stringify(this.users));
+                },
+                
+                logout() {
+                    localStorage.removeItem('userSession');
+                    window.location.href = '../index.html';
+                }
+            }
+        }
+    </script>
+</body>
+</html>

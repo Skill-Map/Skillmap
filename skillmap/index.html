@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skillmap - Ваша карта профессионального развития</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-primary: #1A535C; /* Темный бирюзовый */
+            --color-secondary: #F2C14E; /* Золотой/Желтый */
+            --color-background: #F7F0E3; /* Кремовый фон */
+            --color-text: #0F172A; /* Темный текст для читаемости */
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-background);
+            color: var(--color-text);
+        }
+        .bg-primary { background-color: var(--color-primary); }
+        .text-primary { color: var(--color-primary); }
+        .bg-secondary { background-color: var(--color-secondary); }
+        .text-secondary { color: var(--color-secondary); }
+        .bg-background { background-color: var(--color-background); }
+        .border-primary { border-color: var(--color-primary); }
+        .hero-glow { background: radial-gradient(circle at center, rgba(26, 83, 92, 0.1), transparent 70%); }
+        .btn-primary {
+            background-color: var(--color-primary);
+            color: white;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        .btn-primary:hover {
+            background-color: #247582;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(26, 83, 92, 0.2), 0 4px 6px -4px rgba(26, 83, 92, 0.1);
+        }
+        .modal-backdrop { transition: opacity 0.3s ease-in-out; }
+        .modal-content { transition: transform 0.3s ease-in-out; }
+        [x-cloak] { display: none !important; }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--color-primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Мобильное меню */
+        .mobile-menu {
+            transition: all 0.3s ease;
+            transform: translateY(-100%);
+        }
+        .mobile-menu.open {
+            transform: translateY(0);
+        }
+        /* Активная ссылка в навигации */
+        .nav-link {
+            position: relative;
+            transition: color 0.3s ease;
+        }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background-color: var(--color-primary);
+            transition: width 0.3s ease;
+        }
+        .nav-link:hover::after,
+        .nav-link.active::after {
+            width: 100%;
+        }
+    </style>
+    
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/imask@7.1.3/dist/imask.min.js"></script>
+
+    <script defer>
+    const API_BASE = 'http://127.0.0.1:8082'
+    function appState() {
+        return {
+            modal: { isOpen: false, type: 'login', loading: false, error: '' },
+            loginForm: { email: '', password: '' },
+            registerForm: { 
+                email: '', 
+                password: '', 
+                phone: '', 
+                surname: '',
+                name: '',
+                patronymic: ''
+            },
+            user: { isAuthenticated: false, email: null, name: null },
+            mobileMenuOpen: false,
+            
+            initPhoneMask() {
+                this.$nextTick(() => {
+                    const phoneInput = document.getElementById('register-phone');
+                    if (phoneInput) {
+                        IMask(phoneInput, { 
+                            mask: '+{7} (000) 000-00-00',
+                            lazy: false  // Маска всегда видна
+                        });
+                    }
+                });
+            },
+
+            openModal(type) {
+                this.modal.type = type;
+                this.modal.isOpen = true;
+                this.modal.error = '';
+                if (type === 'register') {
+                    this.registerForm = { 
+                        email: '', 
+                        password: '', 
+                        phone: '', 
+                        surname: '',
+                        name: '',
+                        patronymic: ''
+                    };
+                    setTimeout(() => this.initPhoneMask(), 100);
+                } else {
+                    this.loginForm = { email: '', password: '' };
+                }
+            },
+            closeModal() { this.modal.isOpen = false; },
+            
+            toggleMobileMenu() {
+                this.mobileMenuOpen = !this.mobileMenuOpen;
+            },
+
+            async realApiCall(endpoint, payload, method = 'POST') {
+                this.modal.loading = true;
+                this.modal.error = '';
+                try {
+                    const resp = await fetch(endpoint, {
+                        method,
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await resp.json().catch(() => ({}));
+                    this.modal.loading = false;
+                    return { ok: resp.ok, status: resp.status, json: async () => data };
+                } catch (err) {
+                    this.modal.loading = false;
+                    return { ok: false, status: 0, json: async () => ({ message: err.message }) };
+                }
+            },
+            
+
+            async handleRegister() {
+                if (!this.registerForm.email || !this.registerForm.password || 
+                    !this.registerForm.phone || !this.registerForm.surname || !this.registerForm.name) {
+                    this.modal.error = "Пожалуйста, заполните все обязательные поля (отмечены *)."; 
+                    return;
+                }
+                
+                const phoneDigits = this.registerForm.phone.replace(/\D/g, '');
+                if (phoneDigits.length !== 11) {
+                    this.modal.error = "Номер телефона должен содержать 11 цифр."; 
+                    return;
+                }
+                
+                if (this.registerForm.password.length < 8) {
+                    this.modal.error = "Пароль должен содержать минимум 8 символов."; 
+                    return;
+                }
+                
+                const payload = { 
+                    email: this.registerForm.email, 
+                    password: this.registerForm.password,
+                    phone: phoneDigits,
+                    surname: this.registerForm.surname,
+                    name: this.registerForm.name,
+                    patronymic: this.registerForm.patronymic || null
+                };
+                
+                console.log('Register payload:', payload);
+                
+                const response = await this.realApiCall(`${API_BASE}/api/v1/auth/register`, payload);
+                const data = await response.json();
+                
+                console.log('Register response:', data);
+                
+                if (response.ok) {
+                    // Проверяем, есть ли токен в ответе
+                    if (data.access) {
+                        localStorage.setItem('userSession', JSON.stringify({ 
+                            email: this.registerForm.email, 
+                            access: data.access,
+                            userId: data.user_id,
+                            name: this.registerForm.name,
+                            surname: this.registerForm.surname,
+                            phone: phoneDigits
+                        }));
+                        
+                        this.user.isAuthenticated = true;
+                        this.user.email = this.registerForm.email;
+                        this.user.name = this.registerForm.name;
+                        
+                        this.closeModal();
+                        this.showNotification('Регистрация успешно пройдена!');
+                        
+                        // Перенаправляем на страницу профиля
+                        setTimeout(() => {
+                            window.location.href = 'student/profile.html';
+                        }, 1000);
+                    } else {
+                        // Если токена нет, но регистрация успешна, предлагаем войти
+                        this.modal.error = 'Регистрация успешна! Пожалуйста, войдите с вашими учетными данными.';
+                        this.openModal('login');
+                    }
+                } else {
+                    this.modal.error = data.detail || data.message || 'Произошла ошибка регистрации.';
+                }
+            },
+
+            async handleLogin() {
+                if (!this.loginForm.email || !this.loginForm.password) { 
+                    this.modal.error = "Пожалуйста, заполните все поля."; 
+                    return; 
+                }
+                
+                const payload = { 
+                    username: this.loginForm.email, 
+                    password: this.loginForm.password 
+                };
+                
+                const response = await this.realApiCall(`${API_BASE}/api/v1/auth/login`, payload);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Сохраняем токен
+                    localStorage.setItem('userSession', JSON.stringify({ 
+                        email: this.loginForm.email, 
+                        access: data.access
+                    }));
+                    
+                    this.user.isAuthenticated = true;
+                    this.user.email = this.loginForm.email;
+                    this.closeModal();
+                    this.showNotification('Вход выполнен успешно!');
+                    
+                    // Перенаправляем на страницу профиля
+                    setTimeout(() => {
+                        window.location.href = 'student/profile.html';
+                    }, 1000);
+                } else {
+                    this.modal.error = data.detail || data.message || 'Произошла ошибка входа.';
+                }
+            },
+
+            logout() {
+                this.user = { isAuthenticated: false, email: null, name: null };
+                localStorage.removeItem('userSession');
+                // Если на странице профиля - перенаправляем на главную
+                if (window.location.pathname.includes('profile.html')) {
+                    window.location.href = '../index.html';
+                }
+            },
+            
+            showNotification(message) {
+                let notification = document.createElement('div');
+                notification.textContent = message;
+                notification.className = 'fixed top-5 right-5 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full z-50';
+                document.body.appendChild(notification);
+                
+                requestAnimationFrame(() => {
+                    notification.classList.remove('translate-x-full');
+                });
+
+                setTimeout(() => {
+                    notification.classList.add('translate-x-full');
+                    notification.addEventListener('transitionend', () => notification.remove());
+                }, 4000);
+            },
+            
+            scrollToSection(sectionId, closeMobile = false) {
+                if (closeMobile) {
+                    this.mobileMenuOpen = false;
+                }
+                const element = document.getElementById(sectionId);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth' });
+                }
+            },
+            
+            init() {
+                const session = localStorage.getItem('userSession');
+                if (session) {
+                    try {
+                        const parsedSession = JSON.parse(session);
+                        this.user.isAuthenticated = true;
+                        this.user.email = parsedSession.email;
+                        this.user.name = parsedSession.name || parsedSession.email.split('@')[0];
+                    } catch (e) {
+                        console.error('Ошибка парсинга сессии:', e);
+                        localStorage.removeItem('userSession'); // Удаляем поврежденную сессию
+                    }
+                }
+                
+                // Определяем активную секцию при скролле
+                window.addEventListener('scroll', () => {
+                    const sections = ['hero', 'how-it-works', 'tracks', 'features', 'start'];
+                    const scrollPosition = window.scrollY + 100;
+                    
+                    sections.forEach(sectionId => {
+                        const element = document.getElementById(sectionId);
+                        if (element) {
+                            const link = document.querySelector(`[href="#${sectionId}"]`);
+                            if (link) {
+                                const sectionTop = element.offsetTop;
+                                const sectionBottom = sectionTop + element.offsetHeight;
+                                
+                                if (scrollPosition >= sectionTop && scrollPosition < sectionBottom) {
+                                    link.classList.add('active', 'text-primary', 'font-semibold');
+                                } else {
+                                    link.classList.remove('active', 'text-primary', 'font-semibold');
+                                }
+                            }
+                        }
+                    });
+                });
+            }
+        }
+    }
+    </script>
+</head>
+<body class="antialiased" x-data="appState()" x-init="init()">
+
+    <header class="bg-background/80 backdrop-blur-lg sticky top-0 z-40 w-full border-b border-primary/10">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <a href="#" class="flex items-center space-x-3">
+                    <div class="bg-primary p-2 rounded-lg shadow-md">
+                       <img src="images/logo.png" alt="Skillmap Logo" class="h-7 w-7">
+                    </div>
+                    <span class="text-2xl font-bold text-primary">Skillmap</span>
+                </a>
+
+                <!-- Навигация для десктопа -->
+                <nav class="hidden md:flex items-center space-x-8">
+                    <a href="#" class="nav-link text-gray-700 hover:text-primary font-medium" @click.prevent="scrollToSection('hero')">Главная</a>
+                    <a href="#how-it-works" class="nav-link text-gray-700 hover:text-primary font-medium" @click.prevent="scrollToSection('how-it-works')">Как это работает</a>
+                    <a href="#tracks" class="nav-link text-gray-700 hover:text-primary font-medium" @click.prevent="scrollToSection('tracks')">Треки</a>
+                    <a href="#features" class="nav-link text-gray-700 hover:text-primary font-medium" @click.prevent="scrollToSection('features')">Преимущества</a>
+                    </template>
+                </nav>
+
+                <!-- Кнопка мобильного меню -->
+                <button @click="toggleMobileMenu()" class="md:hidden p-2 rounded-lg text-gray-700 hover:bg-gray-100">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path x-show="!mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        <path x-show="mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+
+                <!-- Кнопки авторизации (скрыты на мобильных в основном меню) -->
+                <div class="hidden md:flex items-center space-x-2">
+                    <template x-if="!user.isAuthenticated">
+                        <div>
+                            <button @click="openModal('login')" class="px-4 py-2 text-sm font-semibold rounded-lg text-primary hover:bg-primary/10 transition">Вход</button>
+                            <button @click="openModal('register')" class="px-4 py-2 text-sm font-semibold rounded-lg btn-primary">Регистрация</button>
+                        </div>
+                    </template>
+                    <template x-if="user.isAuthenticated">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-sm font-medium text-gray-700" x-text="user.name"></span>
+                            <button @click="logout()" class="px-4 py-2 text-sm font-semibold rounded-lg text-primary bg-primary/10 hover:bg-primary/20 transition">Выйти</button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Мобильное меню -->
+        <div x-show="mobileMenuOpen" x-transition.opacity 
+             class="md:hidden mobile-menu absolute top-full left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+            <div class="container mx-auto px-4 py-4">
+                <div class="space-y-3">
+                    <a href="#" class="block py-2 px-3 rounded-lg hover:bg-gray-100 text-gray-700 font-medium" 
+                       @click.prevent="scrollToSection('hero', true)">Главная</a>
+                    <a href="#how-it-works" class="block py-2 px-3 rounded-lg hover:bg-gray-100 text-gray-700 font-medium" 
+                       @click.prevent="scrollToSection('how-it-works', true)">Как это работает</a>
+                    <a href="#tracks" class="block py-2 px-3 rounded-lg hover:bg-gray-100 text-gray-700 font-medium" 
+                       @click.prevent="scrollToSection('tracks', true)">Треки</a>
+                    <a href="#features" class="block py-2 px-3 rounded-lg hover:bg-gray-100 text-gray-700 font-medium" 
+                       @click.prevent="scrollToSection('features', true)">Преимущества</a>
+                    <a href="#start" class="block py-2 px-3 rounded-lg hover:bg-gray-100 text-gray-700 font-medium" 
+                       @click.prevent="scrollToSection('start', true)">Начать</a>
+                    <a href="catalog.html" class="block py-2 px-3 rounded-lg hover:bg-gray-100 text-gray-700 font-medium">Каталог курсов</a>
+                    
+                    <template x-if="user.isAuthenticated">
+                        <a href="student/dashboard.html" class="block py-2 px-3 rounded-lg hover:bg-gray-100 text-gray-700 font-medium">Личный кабинет</a>
+                    </template>
+                    
+                    <div class="pt-4 border-t border-gray-200">
+                        <template x-if="!user.isAuthenticated">
+                            <div class="space-y-2">
+                                <button @click="openModal('login'); toggleMobileMenu()" 
+                                        class="w-full text-left py-2 px-3 rounded-lg hover:bg-gray-100 text-gray-700 font-medium">
+                                    Вход
+                                </button>
+                                <button @click="openModal('register'); toggleMobileMenu()" 
+                                        class="w-full py-2 px-3 rounded-lg btn-primary font-medium">
+                                    Регистрация
+                                </button>
+                            </div>
+                        </template>
+                        <template x-if="user.isAuthenticated">
+                            <div class="space-y-2">
+                                <div class="px-3 py-2">
+                                    <span class="font-medium text-gray-700" x-text="user.name"></span>
+                                    <span class="block text-sm text-gray-500" x-text="user.email"></span>
+                                </div>
+                                <button @click="logout()" 
+                                        class="w-full text-left py-2 px-3 rounded-lg hover:bg-gray-100 text-red-600 font-medium">
+                                    Выйти
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Главный экран -->
+        <section id="hero" class="relative overflow-hidden py-24 md:py-32">
+            <div class="absolute inset-0 hero-glow"></div>
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
+                <h1 class="text-4xl md:text-6xl font-extrabold text-primary tracking-tight">
+                    Постройте свою карту <span class="text-secondary">профессионального</span> развития
+                </h1>
+                <p class="mt-6 max-w-2xl mx-auto text-lg md:text-xl text-slate-600">
+                    Skillmap помогает визуализировать ваши навыки, определить цели и составить индивидуальный план для достижения карьерных высот.
+                </p>
+                <div class="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+                    <button @click="openModal('register')" class="px-8 py-4 text-lg font-bold rounded-xl btn-primary">
+                        Начать бесплатно
+                    </button>
+                    <a href="#how-it-works" @click.prevent="scrollToSection('how-it-works')" 
+                       class="px-8 py-4 text-lg font-bold rounded-xl border-2 border-primary text-primary hover:bg-primary/10 transition">
+                        Узнать больше
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Как это работает -->
+        <section id="how-it-works" class="py-20 md:py-24 bg-white/50">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center max-w-3xl mx-auto">
+                    <h2 class="text-3xl md:text-4xl font-bold text-primary">Как это работает?</h2>
+                    <p class="mt-4 text-lg text-slate-600">Всего 3 простых шага отделяют вас от персональной траектории роста.</p>
+                </div>
+                <div class="mt-16 grid md:grid-cols-3 gap-8 md:gap-12 text-center">
+                    <div class="p-8">
+                        <div class="flex items-center justify-center h-16 w-16 rounded-full bg-secondary/20 text-secondary mx-auto mb-6"><span class="text-2xl font-bold">1</span></div>
+                        <h3 class="text-xl font-bold text-primary">Определите цель</h3>
+                        <p class="mt-2 text-slate-600">Выберите желаемую должность или вставьте ссылку на вакансию, чтобы мы поняли, к чему вы стремитесь.</p>
+                    </div>
+                    <div class="p-8">
+                        <div class="flex items-center justify-center h-16 w-16 rounded-full bg-secondary/20 text-secondary mx-auto mb-6"><span class="text-2xl font-bold">2</span></div>
+                        <h3 class="text-xl font-bold text-primary">Пройдите диагностику</h3>
+                        <p class="mt-2 text-slate-600">Ответьте на несколько вопросов, чтобы система оценила ваши текущие навыки и построила карту компетенций.</p>
+                    </div>
+                    <div class="p-8">
+                        <div class="flex items-center justify-center h-16 w-16 rounded-full bg-secondary/20 text-secondary mx-auto mb-6"><span class="text-2xl font-bold">3</span></div>
+                        <h3 class="text-xl font-bold text-primary">Следуйте плану</h3>
+                        <p class="mt-2 text-slate-600">Получите индивидуальный план на 7 дней, выполняйте практические задания и получайте проверяемые сертификаты.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Популярные треки -->
+        <section id="tracks" class="py-20 md:py-24">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center max-w-3xl mx-auto">
+                    <h2 class="text-3xl md:text-4xl font-bold text-primary">Популярные карьерные треки</h2>
+                    <p class="mt-4 text-lg text-slate-600">Мы подготовили 10 востребованных направлений, чтобы вы могли начать свой путь уже сегодня.</p>
+                </div>
+                <div class="mt-16 grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
+                        <h3 class="font-bold text-primary">Frontend-разработка</h3>
+                        <p class="text-sm text-slate-500 mt-1">React и TypeScript</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
+                        <h3 class="font-bold text-primary">Backend-разработка</h3>
+                        <p class="text-sm text-slate-500 mt-1">Python и FastAPI</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
+                        <h3 class="font-bold text-primary">Тестирование (QA)</h3>
+                        <p class="text-sm text-slate-500 mt-1">Python и pytest</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
+                        <h3 class="font-bold text-primary">DevOps</h3>
+                        <p class="text-sm text-slate-500 mt-1">CI/CD</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
+                        <h3 class="font-bold text-primary">Машинное обучение</h3>
+                        <p class="text-sm text-slate-500 mt-1">ML Fundamentals</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
+                        <h3 class="font-bold text-primary">Бизнес-аналитика</h3>
+                        <p class="text-sm text-slate-500 mt-1">Power BI / Tableau</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
+                        <h3 class="font-bold text-primary">Продуктовая аналитика</h3>
+                        <p class="text-sm text-slate-500 mt-1">SQL и метрики</p>
+                    </div>
+                     <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
+                        <h3 class="font-bold text-primary">Performance-маркетинг</h3>
+                        <p class="text-sm text-slate-500 mt-1">CPC, CAC, LTV</p>
+                    </div>
+                </div>
+                <div class="mt-12 text-center">
+                    <a href="catalog.html" class="inline-flex items-center px-6 py-3 text-primary font-semibold hover:underline">
+                        Посмотреть все курсы
+                        <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Преимущества -->
+        <section id="features" class="py-20 md:py-24 bg-white/50">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+                <div class="order-2 lg:order-1">
+                    <h2 class="text-3xl font-bold text-primary">Ваши достижения — <br> это не просто теория</h2>
+                    <p class="mt-4 text-lg text-slate-600">Мы верим в силу практики. Создавайте реальные проекта, получайте проверяемые сертификаты и формируйте портфолио, которое оценят работодатели.</p>
+                    <ul class="mt-8 space-y-4">
+                        <li class="flex items-start">
+                            <svg class="w-6 h-6 text-secondary mr-3 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <div>
+                                <h4 class="font-semibold text-primary">Фабрика артефактов</h4>
+                                <p class="text-slate-600">Получайте шаблоны заданий, близких к реальным, с автоматической проверкой.</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-6 h-6 text-secondary mr-3 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <div>
+                                <h4 class="font-semibold text-primary">Проверяемые сертификаты</h4>
+                                <p class="text-slate-600">Каждое достижение подтверждается микро-бейджем с QR-кодом для верификации.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <div class="order-1 lg:order-2">
+                    <img src="images/portfolio.png" class="rounded-2xl shadow-xl w-full object-cover h-full" alt="Пример портфолио в Skillmap">
+                </div>
+            </div>
+        </section>
+
+        <!-- Призыв к действию -->
+        <section id="start" class="py-24">
+             <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <h2 class="text-3xl md:text-4xl font-extrabold text-primary">Готовы начать свой путь?</h2>
+                <p class="mt-4 max-w-xl mx-auto text-lg text-slate-600">Присоединяйтесь к Skillmap и сделайте первый шаг к новой профессии уже сегодня.</p>
+                 <div class="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
+                    <button @click="openModal('register')" class="px-8 py-4 text-lg font-bold rounded-xl btn-primary">
+                        Создать карту навыков
+                    </button>
+                    <button @click="scrollToSection('how-it-works')" 
+                            class="px-8 py-4 text-lg font-bold rounded-xl border-2 border-primary text-primary hover:bg-primary/10 transition">
+                        Подробнее о платформе
+                    </button>
+                </div>
+                <div class="mt-8 text-sm text-slate-500">
+                    Уже есть аккаунт? 
+                    <button @click="openModal('login')" class="text-primary font-medium hover:underline ml-1">
+                        Войдите в систему
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Быстрая навигация внизу страницы -->
+    <div class="fixed bottom-6 right-6 z-30 md:hidden">
+        <button @click="scrollToSection('hero')" 
+                class="p-3 bg-primary text-white rounded-full shadow-lg hover:bg-opacity-90 transition">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+            </svg>
+        </button>
+    </div>
+
+    <footer class="bg-primary text-white">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="grid md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="bg-white p-2 rounded-lg">
+                            <img src="images/logo.png" alt="Skillmap Logo" class="h-6 w-6">
+                        </div>
+                        <span class="text-xl font-bold">Skillmap</span>
+                    </div>
+                    <p class="text-gray-300 text-sm">
+                        Платформа для построения индивидуальной карты профессионального развития.
+                    </p>
+                </div>
+                
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Навигация</h3>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-gray-300 hover:text-white transition" @click.prevent="scrollToSection('hero')">Главная</a></li>
+                        <li><a href="#how-it-works" class="text-gray-300 hover:text-white transition" @click.prevent="scrollToSection('how-it-works')">Как это работает</a></li>
+                        <li><a href="#tracks" class="text-gray-300 hover:text-white transition" @click.prevent="scrollToSection('tracks')">Треки</a></li>
+                        <li><a href="catalog.html" class="text-gray-300 hover:text-white transition">Каталог курсов</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Платформа</h3>
+                    <ul class="space-y-2">
+                        <li><a href="catalog.html" class="text-gray-300 hover:text-white transition">Все курсы</a></li>
+                        <template x-if="user.isAuthenticated">
+                            <li><a href="student/dashboard.html" class="text-gray-300 hover:text-white transition">Личный кабинет</a></li>
+                        </template>
+                        <template x-if="!user.isAuthenticated">
+                            <li><button @click="openModal('login')" class="text-gray-300 hover:text-white transition text-left">Вход</button></li>
+                        </template>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Контакты</h3>
+                    <ul class="space-y-2">
+                        <li class="text-gray-300">Email: info@skillmap.ru</li>
+                        <li class="text-gray-300">Телефон: +7 (999) 123-45-67</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mt-8 pt-8 border-t border-gray-700 text-center">
+                <p>&copy; 2025 Skillmap. Все права защищены.</p>
+                <div class="mt-4">
+                    <a href="#" class="px-3 text-sm text-gray-300 hover:text-white">Политика конфиденциальности</a>
+                    <a href="#" class="px-3 text-sm text-gray-300 hover:text-white">Условия использования</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Модальные окна (остаются без изменений) -->
+    <div x-show="modal.isOpen" x-cloak @keydown.escape.window="closeModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="modal.isOpen" x-transition.opacity.duration.300ms class="absolute inset-0 bg-black bg-opacity-60" @click="closeModal()"></div>
+
+        <div x-show="modal.isOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="relative bg-white w-full max-w-md p-8 rounded-2xl shadow-xl">
+            
+            <form x-show="modal.type === 'register'" @submit.prevent="handleRegister()">
+                <h2 class="text-2xl font-bold text-primary mb-1">Создать аккаунт</h2>
+                <p class="text-slate-600 mb-6">Присоединяйтесь к Skillmap!</p>
+                <div x-show="modal.error" class="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm" x-text="modal.error"></div>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="register-surname" class="block text-sm font-medium text-slate-700">Фамилия *</label>
+                            <input type="text" id="register-surname" x-model="registerForm.surname" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                        </div>
+                        <div>
+                            <label for="register-name" class="block text-sm font-medium text-slate-700">Имя *</label>
+                            <input type="text" id="register-name" x-model="registerForm.name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="register-patronymic" class="block text-sm font-medium text-slate-700">Отчество</label>
+                        <input type="text" id="register-patronymic" x-model="registerForm.patronymic" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                    </div>
+                    <div>
+                        <label for="register-email" class="block text-sm font-medium text-slate-700">Email *</label>
+                        <input type="email" id="register-email" x-model="registerForm.email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                    </div>
+                    <div>
+                        <label for="register-phone" class="block text-sm font-medium text-slate-700">Телефон *</label>
+                        <input type="tel" id="register-phone" x-model="registerForm.phone" placeholder="+7 (___) ___-__-__" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                    </div>
+                    <div>
+                        <label for="register-password" class="block text-sm font-medium text-slate-700">Пароль *</label>
+                        <input type="password" id="register-password" x-model="registerForm.password" required minlength="8" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                        <p class="text-xs text-gray-500 mt-1">Минимум 8 символов</p>
+                    </div>
+                </div>
+                <div class="mt-8">
+                    <button type="submit" :disabled="modal.loading" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-opacity-90 focus:outline-none disabled:bg-gray-400 transition">
+                        <span x-show="!modal.loading">Создать аккаунт</span>
+                        <span x-show="modal.loading" class="flex items-center">
+                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Регистрация...
+                        </span>
+                    </button>
+                </div>
+                 <p class="mt-4 text-center text-sm text-slate-600">Уже есть аккаунт? <button type="button" @click="openModal('login')" class="font-medium text-primary hover:underline">Войдите</button></p>
+            </form>
+
+            <form x-show="modal.type === 'login'" @submit.prevent="handleLogin()">
+                 <h2 class="text-2xl font-bold text-primary mb-1">Вход в Skillmap</h2>
+                 <p class="text-slate-600 mb-6">Рады видеть вас снова!</p>
+                 <div x-show="modal.error" class="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm" x-text="modal.error"></div>
+                 <div class="space-y-4">
+                    <div>
+                        <label for="login-email" class="block text-sm font-medium text-slate-700">Email</label>
+                        <input type="email" id="login-email" x-model="loginForm.email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                    </div>
+                    <div>
+                        <label for="login-password" class="block text-sm font-medium text-slate-700">Пароль</label>
+                        <input type="password" id="login-password" x-model="loginForm.password" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                    </div>
+                </div>
+                <div class="mt-8">
+                    <button type="submit" :disabled="modal.loading" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-opacity-90 focus:outline-none disabled:bg-gray-400 transition">
+                         <span x-show="!modal.loading">Войти</span>
+                         <span x-show="modal.loading" class="flex items-center">
+                             <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                             Вход...
+                         </span>
+                    </button>
+                </div>
+                <p class="mt-4 text-center text-sm text-slate-600">Нет аккаунта? <button type="button" @click="openModal('register')" class="font-medium text-primary hover:underline">Зарегистрируйтесь</button></p>
+            </form>
+            
+            <button @click="closeModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><span class="sr-only">Закрыть</span><svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+        </div>
+    </div>
+    
+</body>
+</html>

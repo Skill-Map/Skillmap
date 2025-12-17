@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мои студенты - Skillmap Teacher</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-primary: #1A535C;
+            --color-secondary: #F2C14E;
+            --color-teacher: #0EA5E9;
+        }
+        .teacher-bg { background-color: var(--color-teacher); }
+        .teacher-text { color: var(--color-teacher); }
+        .teacher-border { border-color: var(--color-teacher); }
+        .progress-ring { transform: rotate(-90deg); }
+        .progress-ring-circle {
+            stroke-dasharray: 283;
+            stroke-dashoffset: 283;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+        .student-card {
+            transition: all 0.3s ease;
+        }
+        .student-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        [x-cloak] { display: none !important; }
+    </style>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="antialiased bg-gray-50" x-data="studentsPage()" x-init="init()">
+    <!-- Шапка -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <a href="dashboard.html" class="flex items-center space-x-3">
+                        <div class="teacher-bg p-2 rounded-lg">
+                            <img src="../images/logo.png" alt="Skillmap Logo" class="h-6 w-6">
+                        </div>
+                        <span class="text-xl font-bold teacher-text">Skillmap Teacher</span>
+                    </a>
+                    <nav class="ml-10 flex space-x-6">
+                        <a href="dashboard.html" class="text-gray-600 hover:teacher-text">Дашборд</a>
+                        <a href="students.html" class="teacher-text font-semibold">Мои студенты</a>
+                        <a href="#" class="text-gray-600 hover:teacher-text">Материалы</a>
+                        <a href="#" class="text-gray-600 hover:teacher-text">Задания</a>
+                    </nav>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700" x-text="user.name"></span>
+                    <button @click="logout()" class="px-4 py-2 text-sm font-semibold rounded-lg teacher-text border teacher-border hover:teacher-bg hover:text-white transition">
+                        Выйти
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="p-6">
+        <div class="max-w-7xl mx-auto">
+            <!-- Заголовок и фильтры -->
+            <div class="mb-8">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">Мои студенты</h1>
+                        <p class="text-gray-600 mt-2">Управление и мониторинг прогресса студентов</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button @click="showAddStudentModal = true" 
+                                class="px-4 py-2 teacher-bg text-white rounded-lg hover:bg-opacity-90 transition font-medium">
+                            + Добавить студента
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Фильтры и поиск -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="md:col-span-2">
+                            <input type="text" x-model="searchQuery" 
+                                   placeholder="Поиск по имени, email или треку..."
+                                   class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teacher">
+                        </div>
+                        <select x-model="filterTrack" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teacher">
+                            <option value="">Все треки</option>
+                            <option value="frontend">Frontend</option>
+                            <option value="backend">Backend</option>
+                            <option value="data-science">Data Science</option>
+                            <option value="devops">DevOps</option>
+                        </select>
+                        <select x-model="filterStatus" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teacher">
+                            <option value="">Все статусы</option>
+                            <option value="active">Активные</option>
+                            <option value="inactive">Неактивные</option>
+                            <option value="at-risk">В зоне риска</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Статистика -->
+                    <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="text-center p-3 bg-teacher/5 rounded-lg">
+                            <p class="text-2xl font-bold teacher-text" x-text="stats.total"></p>
+                            <p class="text-sm text-gray-600">Всего студентов</p>
+                        </div>
+                        <div class="text-center p-3 bg-green-50 rounded-lg">
+                            <p class="text-2xl font-bold text-green-600" x-text="stats.active"></p>
+                            <p class="text-sm text-gray-600">Активных</p>
+                        </div>
+                        <div class="text-center p-3 bg-yellow-50 rounded-lg">
+                            <p class="text-2xl font-bold text-yellow-600" x-text="stats.atRisk"></p>
+                            <p class="text-sm text-gray-600">В зоне риска</p>
+                        </div>
+                        <div class="text-center p-3 bg-blue-50 rounded-lg">
+                            <p class="text-2xl font-bold text-blue-600" x-text="`${stats.avgProgress}%`"></p>
+                            <p class="text-sm text-gray-600">Средний прогресс</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Таблица/карточки студентов -->
+            <div x-show="viewMode === 'table'">
+                <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Студент
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Трек
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Прогресс
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Активность
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Статус
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Действия
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <template x-for="student in filteredStudents" :key="student.id">
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="flex-shrink-0 h-10 w-10">
+                                                    <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                                        <span class="font-medium text-gray-700" x-text="student.initials"></span>
+                                                    </div>
+                                                </div>
+                                                <div class="ml-4">
+                                                    <div class="text-sm font-medium text-gray-900" x-text="student.name"></div>
+                                                    <div class="text-sm text-gray-500" x-text="student.email"></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <span class="px-2 py-1 text-xs rounded-full" 
+                                                      :class="student.trackColor"
+                                                      x-text="student.track"></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden mr-3">
+                                                    <div class="h-full rounded-full" 
+                                                         :class="student.progressClass"
+                                                         :style="`width: ${student.progress}%`"></div>
+                                                </div>
+                                                <span class="text-sm font-medium" x-text="`${student.progress}%`"></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <span x-text="student.lastActivity"></span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="px-2 py-1 text-xs rounded-full" 
+                                                  :class="student.statusClass"
+                                                  x-text="student.statusText"></span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            <div class="flex items-center space-x-2">
+                                                <button @click="viewStudent(student)" 
+                                                        class="text-teacher hover:text-teacher/80">
+                                                    Просмотр
+                                                </button>
+                                                <button @click="messageStudent(student)" 
+                                                        class="text-gray-600 hover:text-gray-900">
+                                                    Сообщение
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Карточный вид -->
+            <div x-show="viewMode === 'cards'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <template x-for="student in filteredStudents" :key="student.id">
+                    <div class="student-card bg-white rounded-xl shadow-sm border p-6">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                                    <span class="font-medium text-gray-700" x-text="student.initials"></span>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-gray-900" x-text="student.name"></h3>
+                                    <p class="text-sm text-gray-500" x-text="student.email"></p>
+                                </div>
+                            </div>
+                            <span class="px-2 py-1 text-xs rounded-full" 
+                                  :class="student.statusClass"
+                                  x-text="student.statusText"></span>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <div class="flex items-center justify-between text-sm text-gray-500 mb-1">
+                                <span>Трек обучения</span>
+                                <span class="px-2 py-1 text-xs rounded-full" 
+                                      :class="student.trackColor"
+                                      x-text="student.track"></span>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="flex items-center justify-between text-sm text-gray-500 mb-1">
+                                    <span>Общий прогресс</span>
+                                    <span x-text="`${student.progress}%`"></span>
+                                </div>
+                                <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full" 
+                                         :class="student.progressClass"
+                                         :style="`width: ${student.progress}%`"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-sm text-gray-500">
+                                <div class="flex items-center mb-1">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <span>Последняя активность: <span x-text="student.lastActivity"></span></span>
+                                </div>
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                    <span>На платформе: <span x-text="student.joined"></span></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2 pt-4 border-t">
+                            <button @click="viewStudent(student)" 
+                                    class="flex-1 px-4 py-2 teacher-bg text-white rounded-lg hover:bg-opacity-90 transition text-sm font-medium">
+                                Подробнее
+                            </button>
+                            <button @click="messageStudent(student)" 
+                                    class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm font-medium">
+                                Написать
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Переключение вида и пагинация -->
+            <div class="mt-6 flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-600">Вид:</span>
+                    <button @click="viewMode = 'table'" 
+                            :class="viewMode === 'table' ? 'teacher-bg text-white' : 'bg-gray-200 text-gray-700'"
+                            class="px-3 py-1 rounded-lg text-sm">
+                        Таблица
+                    </button>
+                    <button @click="viewMode = 'cards'" 
+                            :class="viewMode === 'cards' ? 'teacher-bg text-white' : 'bg-gray-200 text-gray-700'"
+                            class="px-3 py-1 rounded-lg text-sm">
+                        Карточки
+                    </button>
+                </div>
+                
+                <div class="flex items-center space-x-2">
+                    <button @click="prevPage()" :disabled="currentPage === 1" 
+                            class="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
+                    <span class="text-sm text-gray-600">Страница <span x-text="currentPage"></span> из <span x-text="totalPages"></span></span>
+                    <button @click="nextPage()" :disabled="currentPage === totalPages" 
+                            class="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Модальное окно добавления студента -->
+    <div x-show="showAddStudentModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div class="bg-white rounded-2xl max-w-md w-full">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-gray-900">Добавить студента</h2>
+                    <button @click="showAddStudentModal = false" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <form @submit.prevent="addStudent()" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email студента</label>
+                        <input type="email" x-model="newStudent.email" required
+                               class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teacher"
+                               placeholder="student@example.com">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Имя студента</label>
+                        <input type="text" x-model="newStudent.name" required
+                               class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teacher"
+                               placeholder="Иван Петров">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Трек обучения</label>
+                        <select x-model="newStudent.track" 
+                                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teacher">
+                            <option value="frontend">Frontend-разработка</option>
+                            <option value="backend">Backend-разработка</option>
+                            <option value="data-science">Data Science</option>
+                            <option value="devops">DevOps</option>
+                            <option value="design">UX/UI дизайн</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Комментарий (опционально)</label>
+                        <textarea x-model="newStudent.note" rows="2"
+                                  class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teacher"
+                                  placeholder="Дополнительная информация..."></textarea>
+                    </div>
+                    
+                    <div class="pt-4 flex items-center space-x-4">
+                        <button type="submit" 
+                                class="flex-1 px-6 py-3 teacher-bg text-white rounded-lg hover:bg-opacity-90 transition font-medium">
+                            Добавить студента
+                        </button>
+                        <button type="button" @click="showAddStudentModal = false"
+                                class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+                            Отмена
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно просмотра студента -->
+    <div x-show="selectedStudent" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
+                            <span class="text-xl font-bold text-gray-700" x-text="selectedStudent?.initials"></span>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900" x-text="selectedStudent?.name"></h2>
+                            <p class="text-gray-500" x-text="selectedStudent?.email"></p>
+                        </div>
+                    </div>
+                    <button @click="selectedStudent = null" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- Детальная информация о студенте -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 space-y-6">
+                        <!-- Прогресс по навыкам -->
+                        <div class="bg-gray-50 p-6 rounded-xl">
+                            <h3 class="font-semibold text-gray-900 mb-4">Прогресс по навыкам</h3>
+                            <div class="space-y-4">
+                                <template x-for="skill in selectedStudent?.skills" :key="skill.id">
+                                    <div>
+                                        <div class="flex items-center justify-between text-sm text-gray-500 mb-1">
+                                            <span x-text="skill.name"></span>
+                                            <span x-text="`${skill.progress}%`"></span>
+                                        </div>
+                                        <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                            <div class="h-full rounded-full teacher-bg" :style="`width: ${skill.progress}%`"></div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        
+                        <!-- История активности -->
+                        <div>
+                            <h3 class="font-semibold text-gray-900 mb-4">История активности</h3>
+                            <div class="space-y-3">
+                                <template x-for="activity in selectedStudent?.activities" :key="activity.id">
+                                    <div class="flex items-start space-x-3 p-3 border rounded-lg">
+                                        <div :class="`p-2 rounded-full ${activity.iconBg}`">
+                                            <svg class="w-4 h-4" :class="activity.iconColor" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="activity.icon"></path>
+                                            </svg>
+                                        </div>
+                                        <div class="flex-1">
+                                            <p class="text-sm font-medium text-gray-900" x-text="activity.title"></p>
+                                            <p class="text-xs text-gray-500" x-text="activity.time"></p>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <!-- Информация о студенте -->
+                        <div class="bg-white border rounded-xl p-6">
+                            <h3 class="font-semibold text-gray-900 mb-4">Информация</h3>
+                            <div class="space-y-3">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Трек</span>
+                                    <span class="font-medium" x-text="selectedStudent?.track"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Начало обучения</span>
+                                    <span class="font-medium" x-text="selectedStudent?.joined"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Общий прогресс</span>
+                                    <span class="font-medium" x-text="`${selectedStudent?.progress}%`"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Статус</span>
+                                    <span class="px-2 py-1 text-xs rounded-full" 
+                                          :class="selectedStudent?.statusClass"
+                                          x-text="selectedStudent?.statusText"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Быстрые действия -->
+                        <div class="space-y-3">
+                            <button @click="messageStudent(selectedStudent)" 
+                                    class="w-full flex items-center justify-center space-x-2 p-3 border rounded-lg hover:border-teacher hover:bg-teacher/5 transition">
+                                <svg class="w-5 h-5 text-teacher" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                                </svg>
+                                <span>Написать сообщение</span>
+                            </button>
+                            <button @click="viewAssignments(selectedStudent)" 
+                                    class="w-full flex items-center justify-center space-x-2 p-3 border rounded-lg hover:border-teacher hover:bg-teacher/5 transition">
+                                <svg class="w-5 h-5 text-teacher" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                </svg>
+                                <span>Проверить задания</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function studentsPage() {
+            return {
+                user: {
+                    name: 'Алексей Иванов',
+                    email: 'alexey@example.com'
+                },
+                viewMode: 'cards',
+                searchQuery: '',
+                filterTrack: '',
+                filterStatus: '',
+                currentPage: 1,
+                itemsPerPage: 12,
+                showAddStudentModal: false,
+                selectedStudent: null,
+                newStudent: {
+                    email: '',
+                    name: '',
+                    track: 'frontend',
+                    note: ''
+                },
+                
+                stats: {
+                    total: 42,
+                    active: 36,
+                    atRisk: 3,
+                    avgProgress: 68
+                },
+                
+                students: [
+                    {
+                        id: 1,
+                        name: 'Иван Петров',
+                        email: 'ivan@example.com',
+                        initials: 'ИП',
+                        track: 'Frontend-разработка',
+                        trackColor: 'bg-blue-100 text-blue-800',
+                        progress: 75,
+                        progressClass: 'bg-blue-500',
+                        status: 'active',
+                        statusText: 'Активен',
+                        statusClass: 'bg-green-100 text-green-800',
+                        lastActivity: '2 часа назад',
+                        joined: '3 месяца назад',
+                        skills: [
+                            { id: 1, name: 'HTML/CSS', progress: 90 },
+                            { id: 2, name: 'JavaScript', progress: 80 },
+                            { id: 3, name: 'React', progress: 60 },
+                            { id: 4, name: 'TypeScript', progress: 40 }
+                        ],
+                        activities: [
+                            {
+                                id: 1,
+                                title: 'Завершил модуль "React Hooks"',
+                                time: 'Вчера, 14:30',
+                                icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+                                iconBg: 'bg-green-100',
+                                iconColor: 'text-green-600'
+                            },
+                            {
+                                id: 2,
+                                title: 'Отправил задание на проверку',
+                                time: '2 дня назад',
+                                icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+                                iconBg: 'bg-blue-100',
+                                iconColor: 'text-blue-600'
+                            }
+                        ]
+                    },
+                    {
+                        id: 2,
+                        name: 'Мария Сидорова',
+                        email: 'maria@example.com',
+                        initials: 'МС',
+                        track: 'Data Science',
+                        trackColor: 'bg-green-100 text-green-800',
+                        progress: 42,
+                        progressClass: 'bg-green-500',
+                        status: 'at-risk',
+                        statusText: 'В зоне риска',
+                        statusClass: 'bg-yellow-100 text-yellow-800',
+                        lastActivity: '5 дней назад',
+                        joined: '2 месяца назад',
+                        skills: [
+                            { id: 1, name: 'Python основы', progress: 70 },
+                            { id: 2, name: 'Pandas', progress: 40 },
+                            { id: 3, name: 'NumPy', progress: 30 },
+                            { id: 4, name: 'ML основы', progress: 20 }
+                        ],
+                        activities: []
+                    },
+                    {
+                        id: 3,
+                        name: 'Александр Кузнецов',
+                        email: 'alex@example.com',
+                        initials: 'АК',
+                        track: 'DevOps',
+                        trackColor: 'bg-purple-100 text-purple-800',
+                        progress: 89,
+                        progressClass: 'bg-purple-500',
+                        status: 'active',
+                        statusText: 'Активен',
+                        statusClass: 'bg-green-100 text-green-800',
+                        lastActivity: 'Сегодня, 09:15',
+                        joined: '4 месяца назад',
+                        skills: [
+                            { id: 1, name: 'Linux', progress: 95 },
+                            { id: 2, name: 'Docker', progress: 85 },
+                            { id: 3, name: 'Kubernetes', progress: 70 },
+                            { id: 4, name: 'CI/CD', progress: 80 }
+                        ],
+                        activities: [
+                            {
+                                id: 1,
+                                title: 'Задал вопрос по Docker',
+                                time: 'Сегодня, 09:15',
+                                icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
+                                iconBg: 'bg-yellow-100',
+                                iconColor: 'text-yellow-600'
+                            }
+                        ]
+                    }
+                ],
+                
+                init() {
+                    // Проверка авторизации и роли
+                    const session = localStorage.getItem('userSession');
+                    if (!session) {
+                        window.location.href = '../index.html';
+                        return;
+                    }
+                    
+                    const userData = JSON.parse(session);
+                    if (userData.role !== 'teacher') {
+                        window.location.href = userData.role === 'admin' ? '../admin/dashboard.html' : '../student/dashboard.html';
+                        return;
+                    }
+                    
+                    this.user.email = userData.email;
+                    this.user.name = userData.name || 'Преподаватель';
+                    
+                    // Загрузка студентов из localStorage
+                    const savedStudents = localStorage.getItem('teacherStudents');
+                    if (savedStudents) {
+                        const parsed = JSON.parse(savedStudents);
+                        if (parsed.length > 0) {
+                            this.students = parsed;
+                            this.updateStats();
+                        }
+                    }
+                },
+                
+                get filteredStudents() {
+                    return this.students.filter(student => {
+                        const matchesSearch = this.searchQuery === '' ||
+                            student.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                            student.email.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                            student.track.toLowerCase().includes(this.searchQuery.toLowerCase());
+                        
+                        const matchesTrack = this.filterTrack === '' || 
+                            student.track.toLowerCase().includes(this.filterTrack.toLowerCase());
+                        
+                        const matchesStatus = this.filterStatus === '' || 
+                            student.status === this.filterStatus;
+                        
+                        return matchesSearch && matchesTrack && matchesStatus;
+                    });
+                },
+                
+                get totalPages() {
+                    return Math.ceil(this.filteredStudents.length / this.itemsPerPage);
+                },
+                
+                get paginatedStudents() {
+                    const start = (this.currentPage - 1) * this.itemsPerPage;
+                    const end = start + this.itemsPerPage;
+                    return this.filteredStudents.slice(start, end);
+                },
+                
+                prevPage() {
+                    if (this.currentPage > 1) {
+                        this.currentPage--;
+                    }
+                },
+                
+                nextPage() {
+                    if (this.currentPage < this.totalPages) {
+                        this.currentPage++;
+                    }
+                },
+                
+                updateStats() {
+                    this.stats.total = this.students.length;
+                    this.stats.active = this.students.filter(s => s.status === 'active').length;
+                    this.stats.atRisk = this.students.filter(s => s.status === 'at-risk').length;
+                    
+                    if (this.students.length > 0) {
+                        const totalProgress = this.students.reduce((sum, s) => sum + s.progress, 0);
+                        this.stats.avgProgress = Math.round(totalProgress / this.students.length);
+                    }
+                },
+                
+                viewStudent(student) {
+                    this.selectedStudent = student;
+                },
+                
+                messageStudent(student) {
+                    alert(`Написать сообщение студенту: ${student.name}`);
+                    // В реальном приложении: открыть чат с студентом
+                },
+                
+                viewAssignments(student) {
+                    alert(`Просмотр заданий студента: ${student.name}`);
+                    // В реальном приложении: window.location.href = `assignments.html?student=${student.id}`;
+                },
+                
+                addStudent() {
+                    // Генерация ID для нового студента
+                    const newId = Math.max(...this.students.map(s => s.id)) + 1;
+                    
+                    const newStudent = {
+                        id: newId,
+                        name: this.newStudent.name,
+                        email: this.newStudent.email,
+                        initials: this.getInitials(this.newStudent.name),
+                        track: this.getTrackName(this.newStudent.track),
+                        trackColor: this.getTrackColor(this.newStudent.track),
+                        progress: 0,
+                        progressClass: 'bg-gray-400',
+                        status: 'active',
+                        statusText: 'Активен',
+                        statusClass: 'bg-green-100 text-green-800',
+                        lastActivity: 'Только что',
+                        joined: 'Сегодня',
+                        skills: [],
+                        activities: []
+                    };
+                    
+                    this.students.push(newStudent);
+                    this.updateStats();
+                    
+                    // Сохраняем в localStorage
+                    localStorage.setItem('teacherStudents', JSON.stringify(this.students));
+                    
+                    // Сбрасываем форму и закрываем модальное окно
+                    this.newStudent = { email: '', name: '', track: 'frontend', note: '' };
+                    this.showAddStudentModal = false;
+                    
+                    alert('Студент успешно добавлен');
+                },
+                
+                getInitials(name) {
+                    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+                },
+                
+                getTrackName(trackKey) {
+                    const tracks = {
+                        'frontend': 'Frontend-разработка',
+                        'backend': 'Backend-разработка',
+                        'data-science': 'Data Science',
+                        'devops': 'DevOps',
+                        'design': 'UX/UI дизайн'
+                    };
+                    return tracks[trackKey] || trackKey;
+                },
+                
+                getTrackColor(trackKey) {
+                    const colors = {
+                        'frontend': 'bg-blue-100 text-blue-800',
+                        'backend': 'bg-yellow-100 text-yellow-800',
+                        'data-science': 'bg-green-100 text-green-800',
+                        'devops': 'bg-purple-100 text-purple-800',
+                        'design': 'bg-pink-100 text-pink-800'
+                    };
+                    return colors[trackKey] || 'bg-gray-100 text-gray-800';
+                },
+                
+                logout() {
+                    localStorage.removeItem('userSession');
+                    window.location.href = '../index.html';
+                }
+            }
+        }
+    </script>
+</body>
+</html>

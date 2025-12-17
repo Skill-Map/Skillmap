@@ -1,0 +1,1111 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin — Skillmap</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Alpine.js -->
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  
+  <style>
+    :root {
+      --color-primary: #1A535C;
+      --color-secondary: #F2C14E;
+    }
+    
+    .login-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen" x-data="adminApp()" x-init="init()">
+  
+  <!-- Модальное окно авторизации -->
+  <div x-show="showLoginModal" x-cloak 
+       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="login-card rounded-2xl w-full max-w-md overflow-hidden">
+      <!-- Заголовок -->
+      <div class="bg-[#1A535C] p-6 text-white text-center">
+        <div class="flex items-center justify-center mb-4">
+          <div class="bg-white p-2 rounded-lg mr-3">
+            <span class="text-[#1A535C] font-bold text-lg">SM</span>
+          </div>
+          <h2 class="text-2xl font-bold">Skillmap Admin</h2>
+        </div>
+        <p class="text-gray-200">Войдите для доступа к панели администратора</p>
+      </div>
+      
+      <!-- Форма входа -->
+      <div class="p-8">
+        <!-- Сообщение об ошибке -->
+        <div x-show="loginError" 
+             class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div class="flex items-center">
+            <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
+            <span class="text-red-700" x-text="loginError"></span>
+          </div>
+        </div>
+        
+        <!-- Поля формы -->
+        <div class="space-y-5">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-envelope mr-2 text-gray-400"></i>
+              Email администратора
+            </label>
+            <input type="email" 
+                   x-model="loginForm.email"
+                   placeholder="admin@skillmap.ru"
+                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A535C]"
+                   :disabled="isLoggingIn">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-lock mr-2 text-gray-400"></i>
+              Пароль
+            </label>
+            <input type="password" 
+                   x-model="loginForm.password"
+                   placeholder="••••••••"
+                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A535C]"
+                   :disabled="isLoggingIn"
+                   @keyup.enter="handleLogin">
+          </div>
+          
+          <div class="pt-4">
+            <button @click="handleLogin()"
+                    :disabled="isLoggingIn"
+                    class="w-full py-3 bg-[#1A535C] text-white rounded-lg hover:bg-opacity-90 transition font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+              <template x-if="!isLoggingIn">
+                <span><i class="fas fa-sign-in-alt mr-2"></i>Войти в панель администратора</span>
+              </template>
+              <template x-if="isLoggingIn">
+                <div class="flex items-center justify-center">
+                  <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                  <span>Проверка данных...</span>
+                </div>
+              </template>
+            </button>
+          </div>
+          
+          <div class="text-center pt-4 border-t border-gray-100">
+            <p class="text-sm text-gray-500">
+              Доступ только для администраторов системы
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Основной контент (показывается только после авторизации) -->
+  <div x-show="!showLoginModal">
+    <!-- Хедер -->
+    <div class="bg-white border-b shadow-sm">
+      <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-[#1A535C] flex items-center justify-center text-white font-bold">SM</div>
+            <div>
+              <div class="text-lg font-bold text-gray-900">Skillmap Admin</div>
+              <div class="text-xs text-gray-500">Панель администратора</div>
+            </div>
+          </div>
+          <nav class="hidden md:flex items-center space-x-6 text-sm">
+            <span class="text-gray-600">Пользователи</span>
+            <span class="text-gray-600">Курсы</span>
+            <span class="text-gray-600">Статистика</span>
+            <span class="text-gray-600">Настройки</span>
+          </nav>
+        </div>
+
+        <div class="flex items-center space-x-4">
+          <div class="text-sm text-gray-700">
+            <span x-text="currentAdmin?.name || currentAdmin?.email || 'Администратор'"></span>
+            <span class="text-xs text-gray-500 ml-2" x-text="'(' + (currentAdmin?.type || 'admin') + ')'"></span>
+          </div>
+          <button @click="logout()" 
+                  class="px-4 py-2 border border-[#1A535C] text-[#1A535C] rounded-md hover:bg-[#1A535C] hover:text-white transition">
+            Выйти
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Контент админ-панели -->
+    <div class="max-w-7xl mx-auto p-6">
+      <!-- Заголовок и кнопки -->
+      <div class="flex items-center justify-between mb-8">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900 mb-2">Панель администратора</h1>
+          <p class="text-gray-600">Управление пользователями и курсами платформы Skillmap</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <button @click="reload()" 
+                  class="px-5 py-2.5 bg-[#1A535C] text-white rounded-lg hover:bg-opacity-90 transition font-medium flex items-center">
+            <i class="fas fa-sync-alt mr-2"></i>Обновить
+          </button>
+          <button @click="openCreateCourse()" 
+                  class="px-5 py-2.5 border border-[#1A535C] text-[#1A535C] rounded-lg hover:bg-[#1A535C] hover:text-white transition font-medium flex items-center">
+            <i class="fas fa-plus mr-2"></i>Создать курс
+          </button>
+        </div>
+      </div>
+
+      <!-- Фильтры -->
+      <div class="bg-white rounded-xl shadow-sm border p-6 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Поиск пользователей</label>
+            <div class="relative">
+              <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+              <input type="text" 
+                     x-model="q" 
+                     placeholder="Поиск по имени, фамилии или email..."
+                     class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A535C]">
+            </div>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Фильтр по роли</label>
+            <select x-model="filterType" 
+                    class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A535C]">
+              <option value="">Все роли</option>
+              <option value="apprentice">Студент (apprentice)</option>
+              <option value="teacher">Преподаватель (teacher)</option>
+              <option value="admin">Администратор (admin)</option>
+              <option value="moderator">Модератор (moderator)</option>
+            </select>
+          </div>
+          
+          <div class="flex items-center">
+            <label class="flex items-center space-x-3 cursor-pointer">
+              <div class="relative">
+                <input type="checkbox" 
+                       x-model="onlyActive" 
+                       class="sr-only">
+                <div class="w-10 h-6 bg-gray-200 rounded-full transition"
+                     :class="onlyActive ? 'bg-[#1A535C]' : ''"></div>
+                <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition transform"
+                     :class="onlyActive ? 'translate-x-4' : ''"></div>
+              </div>
+              <span class="text-sm text-gray-700">Только активные пользователи</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Таблица пользователей -->
+      <div class="bg-white rounded-xl shadow-sm border overflow-hidden mb-8">
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="bg-gray-50 border-b">
+                <th class="text-left p-4 text-sm font-medium text-gray-700">ID</th>
+                <th class="text-left p-4 text-sm font-medium text-gray-700">Пользователь</th>
+                <th class="text-left p-4 text-sm font-medium text-gray-700">Email</th>
+                <th class="text-left p-4 text-sm font-medium text-gray-700">Роль</th>
+                <th class="text-left p-4 text-sm font-medium text-gray-700">Статус</th>
+                <th class="text-left p-4 text-sm font-medium text-gray-700">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="u in filteredUsers" :key="u.id">
+                <tr class="border-b hover:bg-gray-50 transition">
+                  <td class="p-4 text-sm text-gray-500" x-text="u.id"></td>
+                  <td class="p-4">
+                    <div class="font-medium text-gray-900">
+                      <span x-text="(u.name || '') + ' ' + (u.surname || '')"></span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1" x-text="u.phone || 'Телефон не указан'"></div>
+                  </td>
+                  <td class="p-4">
+                    <div class="text-gray-900" x-text="u.email"></div>
+                    <div class="text-xs text-gray-500 mt-1" x-text="formatDate(u.reg_date)"></div>
+                  </td>
+                  <td class="p-4">
+                    <select x-model="u.type" 
+                            @change="changeRole(u)" 
+                            class="px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#1A535C]"
+                            :class="getRoleColor(u.type)">
+                      <option value="apprentice">Студент</option>
+                      <option value="teacher">Преподаватель</option>
+                      <option value="admin">Администратор</option>
+                      <option value="moderator">Модератор</option>
+                    </select>
+                  </td>
+                  <td class="p-4">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                      <div class="relative">
+                        <input type="checkbox" 
+                               :checked="u.active" 
+                               @change="toggleActive(u, $event.target.checked)"
+                               class="sr-only">
+                        <div class="w-10 h-6 rounded-full transition"
+                             :class="u.active ? 'bg-green-500' : 'bg-gray-200'"></div>
+                        <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition transform"
+                             :class="u.active ? 'translate-x-4' : ''"></div>
+                      </div>
+                      <span class="text-sm" :class="u.active ? 'text-green-600' : 'text-red-600'">
+                        <span x-text="u.active ? 'Активен' : 'Неактивен'"></span>
+                      </span>
+                    </label>
+                  </td>
+                  <td class="p-4">
+                    <div class="flex space-x-2">
+                      <button @click="openEnroll(u)" 
+                              class="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition flex items-center">
+                        <i class="fas fa-user-graduate mr-1.5"></i>
+                        <span>Зачислить</span>
+                      </button>
+                      <button @click="viewUser(u)" 
+                              class="px-3 py-1.5 border border-gray-300 text-sm rounded-lg hover:bg-gray-50 transition flex items-center">
+                        <i class="fas fa-eye mr-1.5"></i>
+                        <span>Просмотр</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              
+              <template x-if="filteredUsers.length === 0">
+                <tr>
+                  <td colspan="6" class="p-8 text-center">
+                    <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                      <i class="fas fa-users text-gray-400 text-xl"></i>
+                    </div>
+                    <p class="text-gray-500 font-medium">Пользователи не найдены</p>
+                    <p class="text-gray-400 text-sm mt-2">Измените параметры поиска или фильтры</p>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Секция курсов -->
+      <div class="bg-white rounded-xl shadow-sm border p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-900 mb-2">Курсы платформы</h2>
+            <p class="text-gray-600">Всего курсов: <span x-text="courses.length" class="font-medium"></span></p>
+          </div>
+          <button @click="loadCourses()" 
+                  class="px-4 py-2 text-sm text-[#1A535C] hover:bg-[#1A535C]/10 rounded-lg transition">
+            <i class="fas fa-sync-alt mr-2"></i>Обновить список
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <template x-for="c in courses" :key="c.id">
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+              <div class="flex items-start justify-between mb-3">
+                <div>
+                  <h3 class="font-bold text-gray-900" x-text="c.name"></h3>
+                  <p class="text-sm text-gray-500 mt-1" x-text="c.category || 'Без категории'"></p>
+                </div>
+                <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700">
+                  ID: <span x-text="c.id"></span>
+                </span>
+              </div>
+              <p class="text-sm text-gray-600 mb-4 line-clamp-2" x-text="c.description || 'Описание отсутствует'"></p>
+              <div class="flex items-center text-xs text-gray-500">
+                <i class="fas fa-users mr-1.5"></i>
+                <span x-text="c.student_count || 0"></span>
+                <span class="mx-2">•</span>
+                <i class="fas fa-calendar-alt mr-1.5"></i>
+                <span x-text="formatDate(c.created_at)"></span>
+              </div>
+            </div>
+          </template>
+          
+          <template x-if="courses.length === 0">
+            <div class="col-span-3 py-8 text-center">
+              <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                <i class="fas fa-book text-gray-400 text-xl"></i>
+              </div>
+              <p class="text-gray-500 font-medium">Курсы не найдены</p>
+              <p class="text-gray-400 text-sm mt-2">Создайте первый курс или загрузите их из базы данных</p>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно зачисления на курс -->
+  <div x-show="enrollModal.open" x-cloak 
+       class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md">
+      <div class="p-8">
+        <div class="flex items-start justify-between mb-8">
+          <div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-2">Зачислить на курс</h3>
+            <p class="text-gray-600" x-text="enrollModal.user ? enrollModal.user.email : ''"></p>
+          </div>
+          <button @click="enrollModal.open=false" 
+                  class="text-gray-400 hover:text-gray-600 transition">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        
+        <div class="space-y-6">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-3">
+              Название курса *
+            </label>
+            <input x-model="enrollModal.course_name" 
+                   placeholder="Введите полное название курса..."
+                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A535C]">
+            <p class="text-sm text-gray-500 mt-2">Пользователь будет зачислен на указанный курс</p>
+          </div>
+          
+          <div class="flex gap-4 pt-4">
+            <button @click="enrollUser()" 
+                    class="flex-1 py-3 bg-[#1A535C] text-white rounded-lg hover:bg-opacity-90 transition font-bold">
+              <i class="fas fa-user-graduate mr-2"></i>Зачислить
+            </button>
+            <button @click="enrollModal.open=false" 
+                    class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+              Отмена
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно создания курса -->
+  <div x-show="createCourseModal.open" x-cloak 
+       class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-lg">
+      <div class="p-8">
+        <div class="flex items-start justify-between mb-8">
+          <div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-2">Создать новый курс</h3>
+            <p class="text-gray-600">Добавьте новый курс на платформу</p>
+          </div>
+          <button @click="createCourseModal.open=false" 
+                  class="text-gray-400 hover:text-gray-600 transition">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        
+        <div class="space-y-6">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-3">
+              Название курса *
+            </label>
+            <input x-model="createCourseModal.name" 
+                   placeholder="Введите название курса..."
+                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A535C]">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-3">
+              Описание курса
+            </label>
+            <textarea x-model="createCourseModal.description" 
+                      rows="4"
+                      placeholder="Опишите содержание и цели курса..."
+                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A535C]"></textarea>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-3">
+              Категория
+            </label>
+            <select x-model="createCourseModal.category"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A535C]">
+              <option value="">Выберите категорию</option>
+              <option value="frontend">Frontend-разработка</option>
+              <option value="backend">Backend-разработка</option>
+              <option value="qa">Тестирование (QA)</option>
+              <option value="devops">DevOps</option>
+              <option value="ml">Машинное обучение</option>
+              <option value="analytics">Аналитика</option>
+            </select>
+          </div>
+          
+          <div class="flex gap-4 pt-4">
+            <button @click="createCourse()" 
+                    class="flex-1 py-3 bg-[#1A535C] text-white rounded-lg hover:bg-opacity-90 transition font-bold">
+              <i class="fas fa-plus mr-2"></i>Создать курс
+            </button>
+            <button @click="createCourseModal.open=false" 
+                    class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+              Отмена
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно просмотра пользователя -->
+  <div x-show="viewUserModal.open" x-cloak 
+     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div class="p-8">
+      <div class="flex items-start justify-between mb-8">
+        <div>
+          <h3 class="text-2xl font-bold text-gray-900 mb-2">Данные пользователя</h3>
+          <p class="text-gray-600" x-text="viewUserModal.user?.email || ''"></p>
+        </div>
+        <button @click="viewUserModal.open=false" 
+                class="text-gray-400 hover:text-gray-600 transition">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      
+      <template x-if="viewUserModal.user">
+        <div class="space-y-8">
+          <!-- Основная информация -->
+          <div class="bg-gray-50 rounded-xl p-6">
+            <h4 class="font-semibold text-gray-900 mb-4 text-lg">Основная информация</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div class="space-y-2">
+                <p class="text-sm text-gray-500">ID пользователя</p>
+                <p class="font-medium text-gray-900 text-sm" x-text="viewUserModal.user.id"></p>
+              </div>
+              
+              <div class="space-y-2">
+                <p class="text-sm text-gray-500">ФИО</p>
+                <p class="font-medium text-gray-900">
+                  <span x-text="viewUserModal.user.surname || ''"></span>
+                  <span x-text="' ' + (viewUserModal.user.name || '')"></span>
+                  <span x-text="' ' + (viewUserModal.user.patronymic || '')"></span>
+                </p>
+              </div>
+              
+              <div class="space-y-2">
+                <p class="text-sm text-gray-500">Email</p>
+                <p class="font-medium text-gray-900" x-text="viewUserModal.user.email"></p>
+              </div>
+              
+              <div class="space-y-2">
+                <p class="text-sm text-gray-500">Телефон</p>
+                <p class="font-medium text-gray-900" x-text="viewUserModal.user.phone || 'Не указан'"></p>
+              </div>
+              
+              <div class="space-y-2">
+                <p class="text-sm text-gray-500">Дата регистрации</p>
+                <p class="font-medium text-gray-900" x-text="formatDate(viewUserModal.user.reg_date)"></p>
+              </div>
+              
+              <div class="space-y-2">
+                <p class="text-sm text-gray-500">Статус аккаунта</p>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+                      :class="viewUserModal.user.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+                  <span x-text="viewUserModal.user.active ? 'Активен' : 'Неактивен'"></span>
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Роль и системная информация -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Роль пользователя -->
+            <div class="bg-gray-50 rounded-xl p-6">
+              <h4 class="font-semibold text-gray-900 mb-4 text-lg">Роль и доступы</h4>
+              <div class="space-y-4">
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Тип пользователя</p>
+                  <div class="flex items-center">
+                    <span class="px-3 py-1.5 rounded text-sm font-medium mr-3"
+                          :class="getRoleColor(viewUserModal.user.type)">
+                      <span x-text="viewUserModal.user.type"></span>
+                    </span>
+                    <span x-text="viewUserModal.user.type === 'admin' ? 'Администратор' : 
+                                  viewUserModal.user.type === 'teacher' ? 'Преподаватель' :
+                                  viewUserModal.user.type === 'moderator' ? 'Модератор' : 'Студент'"></span>
+                  </div>
+                </div>
+                
+                <!-- Информация для администратора -->
+                <template x-if="viewUserModal.user.type === 'admin'">
+                  <div class="space-y-3 pt-2 border-t">
+                    <p class="text-sm text-gray-500">Права администратора</p>
+                    <div class="flex flex-wrap gap-2">
+                      <span x-show="viewUserModal.user.super_permissions" 
+                            class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">Супер-права</span>
+                      <span x-show="viewUserModal.user.can_manage_roles" 
+                            class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">Управление ролями</span>
+                      <span x-show="viewUserModal.user.can_manage_billing" 
+                            class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">Биллинг</span>
+                      <span x-show="viewUserModal.user.can_impersonate" 
+                            class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">Имперсонация</span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+            
+            <!-- Системная информация -->
+            <div class="bg-gray-50 rounded-xl p-6">
+              <h4 class="font-semibold text-gray-900 mb-4 text-lg">Системная информация</h4>
+              <div class="grid grid-cols-1 gap-3">
+                <div class="flex justify-between items-center py-2 border-b">
+                  <span class="text-sm text-gray-500">Дата обновления</span>
+                  <span class="text-sm font-medium" x-text="viewUserModal.user.up_date ? formatDate(viewUserModal.user.up_date) : 'Нет данных'"></span>
+                </div>
+                
+                <template x-if="viewUserModal.user.type === 'teacher'">
+                  <div class="flex justify-between items-center py-2 border-b">
+                    <span class="text-sm text-gray-500">Дата найма</span>
+                    <span class="text-sm font-medium" x-text="viewUserModal.user.hire_date || 'Не указана'"></span>
+                  </div>
+                </template>
+                
+                <template x-if="viewUserModal.user.type === 'apprentice'">
+                  <div class="flex justify-between items-center py-2 border-b">
+                    <span class="text-sm text-gray-500">Дата зачисления</span>
+                    <span class="text-sm font-medium" x-text="viewUserModal.user.enrollment_date || 'Не указана'"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Детальная информация по роли -->
+          <template x-if="viewUserModal.user.type === 'teacher'">
+            <div class="bg-gray-50 rounded-xl p-6">
+              <h4 class="font-semibold text-gray-900 mb-4 text-lg">Информация преподавателя</h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Кафедра/отдел</p>
+                  <p class="font-medium text-gray-900" x-text="viewUserModal.user.department || 'Не указан'"></p>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Должность</p>
+                  <p class="font-medium text-gray-900" x-text="viewUserModal.user.title || 'Не указана'"></p>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Рейтинг</p>
+                  <div class="flex items-center">
+                    <span class="font-medium text-gray-900 mr-2" 
+                          x-text="viewUserModal.user.rating || '0'"></span>
+                    <i class="fas fa-star text-yellow-500"></i>
+                  </div>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Часов в неделю</p>
+                  <p class="font-medium text-gray-900" x-text="viewUserModal.user.teacher_hours_per_week || '0'"></p>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Часы приема</p>
+                  <p class="font-medium text-gray-900" x-text="viewUserModal.user.office_hours || 'Не указаны'"></p>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Специализации</p>
+                  <div class="flex flex-wrap gap-1">
+                    <template x-for="spec in (viewUserModal.user.specialties || [])">
+                      <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                        <span x-text="spec"></span>
+                      </span>
+                    </template>
+                    <template x-if="!viewUserModal.user.specialties || viewUserModal.user.specialties.length === 0">
+                      <span class="text-gray-500 text-sm">Не указаны</span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="mt-4 space-y-2" x-show="viewUserModal.user.bio">
+                <p class="text-sm text-gray-500">Биография</p>
+                <p class="text-gray-700" x-text="viewUserModal.user.bio"></p>
+              </div>
+            </div>
+          </template>
+          
+          <template x-if="viewUserModal.user.type === 'apprentice'">
+            <div class="bg-gray-50 rounded-xl p-6">
+              <h4 class="font-semibold text-gray-900 mb-4 text-lg">Информация студента</h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Статус обучения</p>
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+                        :class="viewUserModal.user.status === 'active' ? 'bg-green-100 text-green-800' : 
+                                viewUserModal.user.status === 'inactive' ? 'bg-red-100 text-red-800' : 
+                                'bg-gray-100 text-gray-800'">
+                    <span x-text="viewUserModal.user.status || 'active'"></span>
+                  </span>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Группа</p>
+                  <p class="font-medium text-gray-900" x-text="viewUserModal.user.group_code || 'Не указана'"></p>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Прогресс</p>
+                  <div class="flex items-center">
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 mr-2">
+                      <div class="bg-green-600 h-2.5 rounded-full" 
+                           :style="'width: ' + (viewUserModal.user.progress_percent || 0) + '%'"></div>
+                    </div>
+                    <span class="text-sm font-medium" 
+                          x-text="(viewUserModal.user.progress_percent || 0) + '%'"></span>
+                  </div>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Кредиты</p>
+                  <p class="font-medium text-gray-900" 
+                     x-text="viewUserModal.user.credits_earned || '0'"></p>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Часов в неделю</p>
+                  <p class="font-medium text-gray-900" 
+                     x-text="viewUserModal.user.hours_per_week || '0'"></p>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Плановый выпуск</p>
+                  <p class="font-medium text-gray-900" 
+                     x-text="viewUserModal.user.expected_graduation || 'Не указана'"></p>
+                </div>
+              </div>
+            </div>
+          </template>
+          
+          <template x-if="viewUserModal.user.type === 'moderator'">
+            <div class="bg-gray-50 rounded-xl p-6">
+              <h4 class="font-semibold text-gray-900 mb-4 text-lg">Информация модератора</h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Область ответственности</p>
+                  <p class="font-medium text-gray-900" x-text="viewUserModal.user.assigned_scope || 'Не указана'"></p>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Права доступа</p>
+                  <p class="font-medium text-gray-900" x-text="viewUserModal.user.permissions_scope || 'Не указаны'"></p>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Статус дежурства</p>
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+                        :class="viewUserModal.user.on_call ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'">
+                    <span x-text="viewUserModal.user.on_call ? 'На дежурстве' : 'Не дежурит'"></span>
+                  </span>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Выдано предупреждений</p>
+                  <p class="font-medium text-gray-900" 
+                     x-text="viewUserModal.user.warnings_issued || '0'"></p>
+                </div>
+                
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-500">Забанено пользователей</p>
+                  <p class="font-medium text-gray-900" 
+                     x-text="viewUserModal.user.users_banned || '0'"></p>
+                </div>
+              </div>
+            </div>
+          </template>
+          
+          <div class="pt-6 border-t">
+            <button @click="viewUserModal.open=false" 
+                    class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+              Закрыть
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>
+
+<script>
+function adminApp(){
+  const API_BASE = 'http://127.0.0.1:8082';
+  
+  // Функция проверки, является ли пользователь администратором
+  async function checkAdminAccess() {
+    try {
+      const session = localStorage.getItem('userSession');
+      if (!session) return false;
+      
+      const parsed = JSON.parse(session);
+      const token = parsed.access;
+      
+      if (!token) return false;
+      
+      // Запрос информации о текущем пользователе
+      const response = await fetch(`${API_BASE}/api/v1/users/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) return false;
+      
+      const userData = await response.json();
+      
+      // Проверяем, что пользователь является администратором
+      return userData.type === 'admin';
+      
+    } catch (error) {
+      console.error('Ошибка проверки прав администратора:', error);
+      return false;
+    }
+  }
+
+  return {
+    // Состояние авторизации
+    showLoginModal: true,
+    loginForm: {
+      email: '',
+      password: ''
+    },
+    loginError: '',
+    isLoggingIn: false,
+    currentAdmin: null,
+    
+    // Основные данные
+    users: [],
+    courses: [],
+    q: '',
+    filterType: '',
+    onlyActive: false,
+    
+    // Модальные окна
+    enrollModal: { open: false, user: null, course_name: '' },
+    createCourseModal: { open: false, name: '', description: '', category: '' },
+    viewUserModal: { open: false, user: null },
+    
+    async init(){
+      // Проверяем, есть ли активная сессия администратора
+      const hasAdminAccess = await checkAdminAccess();
+      
+      if (hasAdminAccess) {
+        this.showLoginModal = false;
+        await this.loadCurrentAdmin();
+        await this.reload();
+        await this.loadCourses();
+      } else {
+        this.showLoginModal = true;
+        // Очищаем старую сессию, если она есть
+        localStorage.removeItem('userSession');
+      }
+    },
+    
+    async loadCurrentAdmin() {
+      try {
+        const session = localStorage.getItem('userSession');
+        if (!session) return;
+        
+        const parsed = JSON.parse(session);
+        const token = parsed.access;
+        
+        const response = await fetch(`${API_BASE}/api/v1/users/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          this.currentAdmin = await response.json();
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки данных администратора:', error);
+      }
+    },
+    
+    async handleLogin(){
+      if (!this.loginForm.email || !this.loginForm.password) {
+        this.loginError = 'Пожалуйста, введите email и пароль';
+        return;
+      }
+      
+      this.isLoggingIn = true;
+      this.loginError = '';
+      
+      try {
+        const payload = { 
+          username: this.loginForm.email, 
+          password: this.loginForm.password 
+        };
+        
+        const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          // Сохраняем токен
+          localStorage.setItem('userSession', JSON.stringify({ 
+            email: this.loginForm.email, 
+            access: data.access
+          }));
+          
+          // Проверяем, является ли пользователь администратором
+          const isAdmin = await checkAdminAccess();
+          
+          if (isAdmin) {
+            this.showLoginModal = false;
+            await this.loadCurrentAdmin();
+            await this.reload();
+            await this.loadCourses();
+          } else {
+            this.loginError = 'Доступ разрешен только администраторам системы';
+            localStorage.removeItem('userSession');
+          }
+          
+        } else {
+          this.loginError = data.detail || data.message || 'Ошибка входа. Проверьте email и пароль';
+        }
+        
+      } catch (error) {
+        this.loginError = 'Ошибка соединения. Проверьте подключение к интернету';
+        console.error('Ошибка входа:', error);
+      } finally {
+        this.isLoggingIn = false;
+      }
+    },
+    
+    authHeader() {
+      const session = localStorage.getItem('userSession');
+      if (!session) return {};
+      
+      const parsed = JSON.parse(session);
+      const token = parsed.access;
+      
+      return token ? { 
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json'
+      } : {};
+    },
+
+    async apiFetch(path, opts = {}) {
+      opts.headers = opts.headers || {};
+      Object.assign(opts.headers, this.authHeader());
+      
+      const res = await fetch(API_BASE + path, opts);
+      
+      if (res.status === 401) {
+        this.showLoginModal = true;
+        localStorage.removeItem('userSession');
+        throw new Error('Сессия истекла');
+      }
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+      }
+      
+      return res;
+    },
+
+    async reload(){
+      try {
+        const res = await this.apiFetch(`/api/admin/users`);
+        this.users = await res.json();
+      } catch (e) {
+        console.error('Ошибка загрузки пользователей:', e);
+        alert('Ошибка загрузки пользователей');
+      }
+    },
+
+    get filteredUsers(){
+      let list = this.users.slice();
+      if (this.filterType) list = list.filter(u => u.type === this.filterType);
+      if (this.onlyActive) list = list.filter(u => u.active);
+      if (this.q) {
+        const q = this.q.toLowerCase();
+        list = list.filter(u => {
+          const searchString = `${u.name || ''} ${u.surname || ''} ${u.email || ''} ${u.phone || ''}`.toLowerCase();
+          return searchString.includes(q);
+        });
+      }
+      return list;
+    },
+    
+    getRoleColor(type) {
+      const colors = {
+        'admin': 'bg-red-50 text-red-700',
+        'teacher': 'bg-blue-50 text-blue-700',
+        'moderator': 'bg-yellow-50 text-yellow-700',
+        'apprentice': 'bg-green-50 text-green-700'
+      };
+      return colors[type] || 'bg-gray-50 text-gray-700';
+    },
+    
+    formatDate(dateString) {
+      if (!dateString) return 'Не указана';
+      
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('ru-RU');
+      } catch (e) {
+        return dateString;
+      }
+    },
+
+    async changeRole(u){
+      try {
+        const res = await this.apiFetch(`/api/admin/users/${encodeURIComponent(u.id)}/role`, {
+          method: 'PUT',
+          body: JSON.stringify({ new_role: u.type })
+        });
+        
+        if (!res.ok) throw new Error('status ' + res.status);
+        
+        // Обновляем локально
+        const index = this.users.findIndex(user => user.id === u.id);
+        if (index !== -1) {
+          this.users[index].type = u.type;
+        }
+        
+      } catch (e) {
+        console.error('Ошибка смены роли:', e);
+        alert('Не удалось сменить роль');
+        this.reload();
+      }
+    },
+
+    async toggleActive(u, checked){
+      try {
+        const res = await this.apiFetch(`/api/admin/users/${encodeURIComponent(u.id)}/status`, {
+          method: 'PUT',
+          body: JSON.stringify({ active: checked })
+        });
+        
+        if (!res.ok) throw new Error('status ' + res.status);
+        
+        // Обновляем локально
+        const index = this.users.findIndex(user => user.id === u.id);
+        if (index !== -1) {
+          this.users[index].active = checked;
+        }
+        
+      } catch (e) {
+        console.error('Ошибка изменения статуса:', e);
+        alert('Не удалось изменить статус');
+        this.reload();
+      }
+    },
+
+    openEnroll(u){
+      this.enrollModal.open = true;
+      this.enrollModal.user = u;
+      this.enrollModal.course_name = '';
+    },
+
+    async enrollUser(){
+      try {
+        if (!this.enrollModal.course_name) {
+          alert('Введите название курса');
+          return;
+        }
+        
+        const res = await this.apiFetch(`/api/admin/users/${encodeURIComponent(this.enrollModal.user.id)}/enroll`, {
+          method: 'POST',
+          body: JSON.stringify({ course_name: this.enrollModal.course_name })
+        });
+        
+        if (!res.ok) throw new Error('status ' + res.status);
+        
+        const data = await res.json();
+        alert('Пользователь зачислен на курс');
+        this.enrollModal.open = false;
+        this.reload();
+        
+      } catch (e) {
+        console.error('Ошибка зачисления:', e);
+        alert('Не удалось зачислить пользователя');
+      }
+    },
+
+    // В функции adminApp() обновите loadCourses:
+    async loadCourses(){
+      try {
+        const res = await this.apiFetch(`/api/admin/courses`);
+        const courses = await res.json();
+        
+        // Добавляем student_count к каждому курсу
+        this.courses = courses.map(c => ({
+          ...c,
+          student_count: c.student_count || 0  // Убедимся, что есть значение
+        }));
+      } catch (e) {
+        console.error('Ошибка загрузки курсов:', e);
+        this.courses = [];
+      }
+    },
+
+    openCreateCourse(){
+      this.createCourseModal.open = true;
+      this.createCourseModal.name = '';
+      this.createCourseModal.description = '';
+      this.createCourseModal.category = '';
+    },
+
+    async createCourse(){
+      try {
+        if (!this.createCourseModal.name) {
+          alert('Введите название курса');
+          return;
+        }
+        
+        const res = await this.apiFetch(`/api/admin/courses`, {
+          method: 'POST',
+          body: JSON.stringify({ 
+            name: this.createCourseModal.name, 
+            description: this.createCourseModal.description,
+            category: this.createCourseModal.category
+          })
+        });
+        
+        if (!res.ok) throw new Error('status ' + res.status);
+        
+        const data = await res.json();
+        alert('Курс успешно создан');
+        this.createCourseModal.open = false;
+        await this.loadCourses();
+        
+      } catch (e) {
+        console.error('Ошибка создания курса:', e);
+        alert('Ошибка создания курса: ' + e.message);
+      }
+    },
+
+    viewUser(u){
+      this.viewUserModal.user = u;
+      this.viewUserModal.open = true;
+    },
+
+    logout(){
+      localStorage.removeItem('userSession');
+      window.location.reload();
+    }
+  }
+}
+</script>
+
+</body>
+</html>

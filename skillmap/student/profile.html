@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой профиль - Skillmap</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --color-primary: #1A535C;
+            --color-secondary: #F2C14E;
+            --color-background: #F7F0E3;
+            --color-text: #0F172A;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-background);
+            color: var(--color-text);
+        }
+        
+        .bg-background { background-color: var(--color-background); }
+        .text-primary { color: var(--color-primary); }
+        .bg-primary { background-color: var(--color-primary); }
+        .border-primary { border-color: var(--color-primary); }
+        .text-secondary { color: var(--color-secondary); }
+        .bg-secondary { background-color: var(--color-secondary); }
+        
+        /* Стили для навигации как на других страницах */
+        .nav-link {
+            position: relative;
+            transition: color 0.3s ease;
+        }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background-color: var(--color-primary);
+            transition: width 0.3s ease;
+        }
+        .nav-link:hover::after,
+        .nav-link.active::after {
+            width: 100%;
+        }
+        
+        /* Стили карточек как в каталоге */
+        .profile-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e5e7eb;
+            transition: all 0.3s ease;
+        }
+        
+        .profile-card:hover {
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        }
+        
+        /* Кнопки в стиле платформы */
+        .btn-primary {
+            background-color: var(--color-primary);
+            color: white;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-primary:hover {
+            background-color: #247582;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(26, 83, 92, 0.2), 0 4px 6px -4px rgba(26, 83, 92, 0.1);
+        }
+        
+        .btn-outline {
+            border: 2px solid var(--color-primary);
+            color: var(--color-primary);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-outline:hover {
+            background-color: var(--color-primary);
+            color: white;
+        }
+        
+        /* Стили для прогресс-бара */
+        .progress-bar {
+            background-color: rgba(26, 83, 92, 0.1);
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            background-color: var(--color-primary);
+            height: 8px;
+            border-radius: 9999px;
+            transition: width 0.3s ease;
+        }
+        
+        /* Анимации */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--color-primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Стили для полей ввода */
+        .input-field {
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+        }
+        
+        .input-field:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(26, 83, 92, 0.1);
+        }
+        
+        /* Стили для статистики */
+        .stat-item {
+            background: linear-gradient(135deg, rgba(26, 83, 92, 0.05) 0%, rgba(26, 83, 92, 0.02) 100%);
+            border: 1px solid rgba(26, 83, 92, 0.1);
+            border-radius: 12px;
+            padding: 1.25rem;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-item:hover {
+            border-color: var(--color-primary);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+
+<body class="antialiased bg-background" x-data="profilePage()" x-init="init()">
+    <!-- Обновленный хедер в едином стиле -->
+    <header class="bg-background/80 backdrop-blur-lg sticky top-0 z-40 w-full border-b border-primary/10">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <a href="../index.html" class="flex items-center space-x-3">
+                    <div class="bg-primary p-2 rounded-lg shadow-md">
+                        <img src="../images/logo.png" alt="Skillmap Logo" class="h-7 w-7">
+                    </div>
+                    <span class="text-2xl font-bold text-primary">Skillmap</span>
+                </a>
+
+                <!-- Навигация для десктопа -->
+                <nav class="hidden md:flex items-center space-x-8">
+                    <a href="dashboard.html" class="nav-link text-gray-700 hover:text-primary font-medium">Дашборд</a>
+                    <a href="skills.html" class="nav-link text-gray-700 hover:text-primary font-medium">Навыки</a>
+                    <a href="catalog.html" class="nav-link text-gray-700 hover:text-primary font-medium">Курсы</a>
+                    <a href="profile.html" class="nav-link text-primary font-semibold active">Профиль</a>
+                </nav>
+
+                <!-- Информация о пользователе -->
+                <div class="hidden md:flex items-center space-x-4" id="auth-buttons">
+                    <!-- Заполняется JavaScript -->
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="min-h-screen py-8">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+            <!-- Заголовок -->
+            <div class="mb-8 text-center">
+                <h1 class="text-4xl md:text-5xl font-extrabold text-primary tracking-tight mb-4">
+                    Мой профиль
+                </h1>
+                <p class="text-lg text-slate-600 max-w-2xl mx-auto">
+                    Управляйте вашими личными данными и настройками аккаунта
+                </p>
+            </div>
+
+            <!-- Загрузка -->
+            <template x-if="loading">
+                <div class="flex flex-col items-center justify-center py-16">
+                    <div class="loader mb-4"></div>
+                    <p class="text-gray-600">Загружаем ваш профиль...</p>
+                </div>
+            </template>
+
+            <!-- Ошибка -->
+            <template x-if="error">
+                <div class="bg-red-50 border border-red-200 rounded-xl p-6 mb-8 max-w-2xl mx-auto">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle text-red-500 text-xl mr-3"></i>
+                        <div>
+                            <h3 class="font-semibold text-red-800">Ошибка загрузки</h3>
+                            <p class="text-red-700 mt-1" x-text="error"></p>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Основной контент -->
+            <template x-if="!loading && profile">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Левая колонка - профиль и статистика -->
+                    <div class="lg:col-span-1 space-y-6">
+                        <!-- Карточка профиля -->
+                        <div class="profile-card p-8">
+                            <!-- Аватар -->
+                            <div class="flex flex-col items-center mb-8">
+                                <div class="w-40 h-40 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white text-5xl font-bold mb-6 shadow-lg">
+                                    <span x-text="getInitials()"></span>
+                                </div>
+                                <h2 class="text-2xl font-bold text-gray-900 mb-2" x-text="getFullName()"></h2>
+                                <p class="text-gray-600 mb-4" x-text="profile.email"></p>
+                                <div class="inline-flex items-center px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                                    <i class="fas fa-user-graduate mr-2"></i>
+                                    <span x-text="getUserType()"></span>
+                                </div>
+                            </div>
+
+                            <!-- Действия с профилем -->
+                            <div class="space-y-4">
+                                <button @click="changePassword()" 
+                                        class="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 rounded-xl transition">
+                                    <div class="flex items-center">
+                                        <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mr-3">
+                                            <i class="fas fa-lock text-primary"></i>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium text-gray-900">Сменить пароль</span>
+                                            <p class="text-sm text-gray-500 mt-1">Обновите пароль для безопасности</p>
+                                        </div>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </button>
+                                
+                                <button @click="exportData()" 
+                                        class="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 rounded-xl transition">
+                                    <div class="flex items-center">
+                                        <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mr-3">
+                                            <i class="fas fa-download text-primary"></i>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium text-gray-900">Экспорт данных</span>
+                                            <p class="text-sm text-gray-500 mt-1">Скачайте все ваши данные</p>
+                                        </div>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Статистика аккаунта -->
+                        <div class="profile-card p-6">
+                            <h3 class="text-lg font-bold text-primary mb-6 flex items-center">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Статистика аккаунта
+                            </h3>
+                            
+                            <div class="space-y-4">
+                                <div class="stat-item">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-sm font-medium text-gray-600">Статус аккаунта</span>
+                                        <span class="text-sm font-medium" x-text="getStatusText()" :class="getStatusColor()"></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="stat-item">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-sm font-medium text-gray-600">Дата регистрации</span>
+                                        <span class="text-sm font-medium" x-text="formatDate(profile.reg_date)"></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="stat-item">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-sm font-medium text-gray-600">Активность</span>
+                                        <span class="text-sm font-medium" x-text="profile.active ? 'Активен' : 'Неактивен'" 
+                                               :class="profile.active ? 'text-green-600' : 'text-red-600'"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Правая колонка - информация -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <!-- Личная информация -->
+                        <div class="profile-card p-8">
+                            <div class="flex items-center justify-between mb-8">
+                                <div>
+                                    <h3 class="text-2xl font-bold text-primary mb-2">Личная информация</h3>
+                                    <p class="text-gray-600">Основные данные вашего профиля</p>
+                                </div>
+                                <button @click="editMode.personal = !editMode.personal" 
+                                        class="px-5 py-2.5 rounded-lg font-medium transition flex items-center"
+                                        :class="editMode.personal ? 'btn-outline' : 'btn-primary'">
+                                    <i class="fas fa-pencil-alt mr-2"></i>
+                                    <span x-text="editMode.personal ? 'Отменить' : 'Редактировать'"></span>
+                                </button>
+                            </div>
+
+                            <div class="space-y-8">
+                                <template x-if="!editMode.personal">
+                                    <!-- Просмотр -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div class="space-y-2">
+                                            <p class="text-sm text-gray-500 flex items-center">
+                                                <i class="fas fa-id-card mr-2"></i>Фамилия
+                                            </p>
+                                            <p class="text-lg font-medium" x-text="profile.surname || 'Не указана'"></p>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <p class="text-sm text-gray-500 flex items-center">
+                                                <i class="fas fa-user mr-2"></i>Имя
+                                            </p>
+                                            <p class="text-lg font-medium" x-text="profile.name || 'Не указано'"></p>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <p class="text-sm text-gray-500 flex items-center">
+                                                <i class="fas fa-user-tag mr-2"></i>Отчество
+                                            </p>
+                                            <p class="text-lg font-medium" x-text="profile.patronymic || 'Не указано'"></p>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <p class="text-sm text-gray-500 flex items-center">
+                                                <i class="fas fa-envelope mr-2"></i>Email
+                                            </p>
+                                            <p class="text-lg font-medium" x-text="profile.email"></p>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <p class="text-sm text-gray-500 flex items-center">
+                                                <i class="fas fa-phone mr-2"></i>Телефон
+                                            </p>
+                                            <p class="text-lg font-medium" x-text="formatPhone(profile.phone) || 'Не указан'"></p>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <p class="text-sm text-gray-500 flex items-center">
+                                                <i class="fas fa-users mr-2"></i>Тип пользователя
+                                            </p>
+                                            <p class="text-lg font-medium" x-text="getUserType()"></p>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <template x-if="editMode.personal">
+                                    <!-- Редактирование -->
+                                    <form @submit.prevent="savePersonalInfo()" class="space-y-6">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                                    <i class="fas fa-id-card mr-2"></i>Фамилия *
+                                                </label>
+                                                <input type="text" x-model="editForm.surname" required
+                                                       class="input-field w-full"
+                                                       placeholder="Введите вашу фамилию">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                                    <i class="fas fa-user mr-2"></i>Имя *
+                                                </label>
+                                                <input type="text" x-model="editForm.name" required
+                                                       class="input-field w-full"
+                                                       placeholder="Введите ваше имя">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                                    <i class="fas fa-user-tag mr-2"></i>Отчество
+                                                </label>
+                                                <input type="text" x-model="editForm.patronymic"
+                                                       class="input-field w-full"
+                                                       placeholder="Введите ваше отчество">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                                    <i class="fas fa-phone mr-2"></i>Телефон
+                                                </label>
+                                                <input type="tel" id="edit-phone" x-model="editForm.phone" 
+                                                       placeholder="+7 (___) ___-__-__"
+                                                       class="input-field w-full">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="flex items-center space-x-4 pt-4">
+                                            <button type="submit" :disabled="saving"
+                                                    class="btn-primary px-8 py-3 rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <i class="fas fa-save mr-2"></i>
+                                                <span x-show="!saving">Сохранить изменения</span>
+                                                <span x-show="saving" class="flex items-center">
+                                                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    Сохранение...
+                                                </span>
+                                            </button>
+                                            <button type="button" @click="cancelEdit('personal')"
+                                                    class="px-8 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+                                                Отмена
+                                            </button>
+                                        </div>
+                                    </form>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Информация о студенте -->
+                        <template x-if="profile.type === 'apprentice'">
+                            <div class="profile-card p-8">
+                                <h3 class="text-2xl font-bold text-primary mb-6 flex items-center">
+                                    <i class="fas fa-graduation-cap mr-3"></i>
+                                    Учебная информация
+                                </h3>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div class="space-y-6">
+                                        <div>
+                                            <p class="text-sm text-gray-500 mb-2">Группа</p>
+                                            <div class="text-xl font-semibold text-primary">
+                                                <i class="fas fa-users mr-2"></i>
+                                                <span x-text="profile.group_code || 'Не указана'"></span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <p class="text-sm text-gray-500 mb-2">Трек обучения</p>
+                                            <div class="text-xl font-semibold text-primary">
+                                                <i class="fas fa-road mr-2"></i>
+                                                <span x-text="profile.track_id || 'Не указан'"></span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <p class="text-sm text-gray-500 mb-2">Заработано кредитов</p>
+                                            <div class="text-2xl font-bold text-secondary">
+                                                <i class="fas fa-coins mr-2"></i>
+                                                <span x-text="profile.credits_earned || 0"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="space-y-6">
+                                        <div>
+                                            <p class="text-sm text-gray-500 mb-2">Прогресс обучения</p>
+                                            <div class="space-y-2">
+                                                <div class="flex justify-between text-sm">
+                                                    <span>Выполнено</span>
+                                                    <span class="font-semibold" x-text="(profile.progress_percent || 0) + '%'"></span>
+                                                </div>
+                                                <div class="progress-bar">
+                                                    <div class="progress-fill" :style="'width: ' + (profile.progress_percent || 0) + '%'"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <p class="text-sm text-gray-500 mb-2">Дата зачисления</p>
+                                            <div class="text-lg font-medium">
+                                                <i class="fas fa-calendar-alt mr-2 text-gray-400"></i>
+                                                <span x-text="formatDate(profile.enrollment_date)"></span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <p class="text-sm text-gray-500 mb-2">Ожидаемый выпуск</p>
+                                            <div class="text-lg font-medium">
+                                                <i class="fas fa-calendar-check mr-2 text-gray-400"></i>
+                                                <span x-text="formatDate(profile.expected_graduation)"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Информация для преподавателя -->
+                        <template x-if="profile.type === 'teacher'">
+                            <div class="profile-card p-8">
+                                <h3 class="text-2xl font-bold text-primary mb-6 flex items-center">
+                                    <i class="fas fa-chalkboard-teacher mr-3"></i>
+                                    Информация преподавателя
+                                </h3>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div class="space-y-6">
+                                        <div>
+                                            <p class="text-sm text-gray-500 mb-2">Должность</p>
+                                            <div class="text-xl font-semibold text-primary">
+                                                <i class="fas fa-briefcase mr-2"></i>
+                                                <span x-text="profile.title || 'Не указана'"></span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <p class="text-sm text-gray-500 mb-2">Отдел</p>
+                                            <div class="text-xl font-semibold text-primary">
+                                                <i class="fas fa-building mr-2"></i>
+                                                <span x-text="profile.department || 'Не указан'"></span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <p class="text-sm text-gray-500 mb-2">Дата найма</p>
+                                            <div class="text-lg font-medium">
+                                                <i class="fas fa-calendar-alt mr-2 text-gray-400"></i>
+                                                <span x-text="formatDate(profile.hire_date)"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="space-y-6">
+                                        <div>
+                                            <p class="text-sm text-gray-500 mb-2">Рейтинг</p>
+                                            <div class="flex items-center">
+                                                <div class="text-3xl font-bold text-secondary mr-3">
+                                                    <span x-text="profile.rating || '5.0'"></span>
+                                                </div>
+                                                <div class="text-yellow-400">
+                                                    <i class="fas fa-star"></i>
+                                                    <i class="fas fa-star"></i>
+                                                    <i class="fas fa-star"></i>
+                                                    <i class="fas fa-star"></i>
+                                                    <i class="fas fa-star-half-alt"></i>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <p class="text-sm text-gray-500 mb-2">Часов в неделю</p>
+                                            <div class="text-xl font-semibold text-primary">
+                                                <i class="fas fa-clock mr-2"></i>
+                                                <span x-text="profile.teacher_hours_per_week"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- История активности -->
+                        <div class="profile-card p-8">
+                            <h3 class="text-2xl font-bold text-primary mb-6 flex items-center">
+                                <i class="fas fa-history mr-3"></i>
+                                История активности
+                            </h3>
+                            
+                            <template x-if="profile.up_date && profile.up_date.length > 0">
+                                <div class="space-y-4">
+                                    <template x-for="(date, index) in profile.up_date.slice().reverse()" :key="index">
+                                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
+                                            <div class="flex items-center">
+                                                <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mr-4">
+                                                    <i class="fas fa-sync text-primary"></i>
+                                                </div>
+                                                <div>
+                                                    <p class="font-medium text-gray-900">Обновление профиля</p>
+                                                    <p class="text-sm text-gray-500 mt-1">Изменены личные данные</p>
+                                                </div>
+                                            </div>
+                                            <span class="text-sm text-gray-500" x-text="formatDate(date)"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="!profile.up_date || profile.up_date.length === 0">
+                                <div class="text-center py-12">
+                                    <div class="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                        <i class="fas fa-history text-2xl text-gray-400"></i>
+                                    </div>
+                                    <h4 class="text-lg font-medium text-gray-900 mb-2">История активности пуста</h4>
+                                    <p class="text-gray-600">Здесь будет отображаться история ваших действий в профиле</p>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </main>
+
+    <!-- Футер в едином стиле -->
+    <footer class="bg-primary text-white mt-20">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="grid md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="bg-white p-2 rounded-lg">
+                            <img src="../images/logo.png" alt="Skillmap Logo" class="h-6 w-6">
+                        </div>
+                        <span class="text-xl font-bold">Skillmap</span>
+                    </div>
+                    <p class="text-gray-300 text-sm">
+                        Платформа для построения индивидуальной карты профессионального развития.
+                    </p>
+                </div>
+                
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Навигация</h3>
+                    <ul class="space-y-2">
+                        <li><a href="../index.html" class="text-gray-300 hover:text-white transition">Главная</a></li>
+                        <li><a href="dashboard.html" class="text-gray-300 hover:text-white transition">Дашборд</a></li>
+                        <li><a href="catalog.html" class="text-gray-300 hover:text-white transition">Каталог курсов</a></li>
+                        <li><a href="profile.html" class="text-gray-300 hover:text-white transition">Профиль</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Ресурсы</h3>
+                    <ul class="space-y-2">
+                        <li><a href="skills.html" class="text-gray-300 hover:text-white transition">Навыки</a></li>
+                        <li><a href="goal.html" class="text-gray-300 hover:text-white transition">Постановка целей</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition">Помощь</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition">FAQ</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Контакты</h3>
+                    <ul class="space-y-2">
+                        <li class="text-gray-300">Email: info@skillmap.ru</li>
+                        <li class="text-gray-300">Телефон: +7 (999) 123-45-67</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mt-8 pt-8 border-t border-gray-700 text-center">
+                <p>&copy; 2025 Skillmap. Все права защищены.</p>
+                <div class="mt-4">
+                    <a href="#" class="px-3 text-sm text-gray-300 hover:text-white">Политика конфиденциальности</a>
+                    <a href="#" class="px-3 text-sm text-gray-300 hover:text-white">Условия использования</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Скрипты -->
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/imask@7.1.3/dist/imask.min.js"></script>
+
+    <script>
+        function profilePage() {
+            return {
+                API_BASE: 'http://127.0.0.1:8082',
+                profile: null,
+                loading: true,
+                saving: false,
+                error: null,
+                editMode: {
+                    personal: false
+                },
+                editForm: {},
+                
+                async init() {
+                    // Проверка авторизации
+                    const session = localStorage.getItem('userSession');
+                    if (!session) {
+                        window.location.href = '../index.html';
+                        return;
+                    }
+                    
+                    await this.loadProfile();
+                    
+                    // Инициализация маски телефона
+                    this.$nextTick(() => {
+                        const phoneInput = document.getElementById('edit-phone');
+                        if (phoneInput) {
+                            IMask(phoneInput, { 
+                                mask: '+{7} (000) 000-00-00',
+                                lazy: false
+                            });
+                        }
+                    });
+                },
+                
+                async loadProfile() {
+                    this.loading = true;
+                    this.error = null;
+                    
+                    try {
+                        const session = JSON.parse(localStorage.getItem('userSession'));
+                        if (!session || !session.access) {
+                            throw new Error('Сессия не найдена или токен отсутствует');
+                        }
+                        
+                        const response = await fetch(`${this.API_BASE}/api/v1/users/me`, {
+                            headers: {
+                                'Authorization': `Bearer ${session.access}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        if (response.status === 401) {
+                            localStorage.removeItem('userSession');
+                            throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+                        }
+                        
+                        if (!response.ok) {
+                            throw new Error(`Ошибка загрузки профиля: ${response.status}`);
+                        }
+                        
+                        this.profile = await response.json();
+                        this.resetEditForm();
+                        
+                    } catch (err) {
+                        this.error = err.message || 'Ошибка при загрузке профиля';
+                        console.error('Ошибка загрузки профиля:', err);
+                        
+                        if (err.message.includes('Сессия истекла') || err.message.includes('401')) {
+                            setTimeout(() => {
+                                window.location.href = '../index.html';
+                            }, 3000);
+                        }
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                resetEditForm() {
+                    if (this.profile) {
+                        this.editForm = {
+                            surname: this.profile.surname || '',
+                            name: this.profile.name || '',
+                            patronymic: this.profile.patronymic || '',
+                            phone: this.formatPhone(this.profile.phone) || ''
+                        };
+                    }
+                },
+                
+                getFullName() {
+                    if (!this.profile) return '';
+                    return `${this.profile.surname || ''} ${this.profile.name || ''} ${this.profile.patronymic || ''}`.trim();
+                },
+                
+                getInitials() {
+                    if (!this.profile) return '?';
+                    const first = this.profile.name ? this.profile.name[0] : '';
+                    const last = this.profile.surname ? this.profile.surname[0] : '';
+                    return (first + last).toUpperCase() || 'U';
+                },
+                
+                getUserType() {
+                    if (!this.profile) return '';
+                    const types = {
+                        'admin': 'Администратор',
+                        'apprentice': 'Студент',
+                        'teacher': 'Преподаватель',
+                        'moderator': 'Модератор'
+                    };
+                    return types[this.profile.type] || this.profile.type;
+                },
+                
+                getStatusText() {
+                    if (!this.profile) return '';
+                    
+                    if (this.profile.type === 'apprentice') {
+                        const statuses = {
+                            'active': 'Активен',
+                            'inactive': 'Неактивен',
+                            'graduated': 'Выпускник',
+                            'suspended': 'Приостановлен'
+                        };
+                        return statuses[this.profile.status] || this.profile.status;
+                    }
+                    
+                    return this.profile.active ? 'Активен' : 'Неактивен';
+                },
+                
+                getStatusColor() {
+                    if (!this.profile) return '';
+                    
+                    if (this.profile.type === 'apprentice') {
+                        const colors = {
+                            'active': 'text-green-600',
+                            'inactive': 'text-yellow-600',
+                            'graduated': 'text-blue-600',
+                            'suspended': 'text-red-600'
+                        };
+                        return colors[this.profile.status] || '';
+                    }
+                    
+                    return this.profile.active ? 'text-green-600' : 'text-red-600';
+                },
+                
+                formatDate(dateString) {
+                    if (!dateString) return 'Не указана';
+                    
+                    try {
+                        if (dateString.includes('T')) {
+                            const date = new Date(dateString);
+                            return date.toLocaleDateString('ru-RU');
+                        }
+                        
+                        if (dateString.includes('.')) {
+                            const [day, month, year] = dateString.split('.');
+                            return `${day.padStart(2, '0')}.${month.padStart(2, '0')}.${year}`;
+                        }
+                        
+                        return dateString;
+                    } catch (e) {
+                        return dateString;
+                    }
+                },
+                
+                formatPhone(phone) {
+                    if (!phone) return '';
+                    const cleaned = phone.replace(/\D/g, '');
+                    if (cleaned.length === 11) {
+                        return `+7 (${cleaned.substring(1, 4)}) ${cleaned.substring(4, 7)}-${cleaned.substring(7, 9)}-${cleaned.substring(9, 11)}`;
+                    }
+                    return phone;
+                },
+                
+                async savePersonalInfo() {
+                    this.saving = true;
+                    this.error = null;
+                    
+                    try {
+                        const session = JSON.parse(localStorage.getItem('userSession'));
+                        
+                        // Очищаем телефон от формата
+                        const cleanPhone = this.editForm.phone ? this.editForm.phone.replace(/\D/g, '') : null;
+                        const updateData = {
+                            ...this.editForm,
+                            phone: cleanPhone
+                        };
+                        
+                        const response = await fetch(`${this.API_BASE}/api/v1/users/me`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Authorization': `Bearer ${session.access}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(updateData)
+                        });
+                        
+                        if (!response.ok) {
+                            const data = await response.json();
+                            throw new Error(data.detail || 'Ошибка обновления профиля');
+                        }
+                        
+                        // Обновляем сессию
+                        const updatedSession = {
+                            ...session,
+                            name: this.editForm.name,
+                            surname: this.editForm.surname,
+                            phone: cleanPhone
+                        };
+                        localStorage.setItem('userSession', JSON.stringify(updatedSession));
+                        
+                        await this.loadProfile();
+                        this.editMode.personal = false;
+                        this.showNotification('Данные успешно сохранены');
+                    } catch (err) {
+                        this.error = err.message;
+                    } finally {
+                        this.saving = false;
+                    }
+                },
+                
+                cancelEdit(mode) {
+                    this.editMode[mode] = false;
+                    this.resetEditForm();
+                },
+                
+                async changePassword() {
+                    const oldPassword = prompt('Введите текущий пароль:');
+                    if (!oldPassword) return;
+                    
+                    const newPassword = prompt('Введите новый пароль:');
+                    if (!newPassword) return;
+                    
+                    const confirmPassword = prompt('Подтвердите новый пароль:');
+                    if (newPassword !== confirmPassword) {
+                        alert('Пароли не совпадают');
+                        return;
+                    }
+                    
+                    try {
+                        const session = JSON.parse(localStorage.getItem('userSession'));
+                        const response = await fetch(`${this.API_BASE}/api/v1/auth/change-password`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${session.access}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                old_password: oldPassword,
+                                new_password: newPassword
+                            })
+                        });
+                        
+                        if (!response.ok) {
+                            const data = await response.json();
+                            throw new Error(data.detail || 'Ошибка смены пароля');
+                        }
+                        
+                        this.showNotification('Пароль успешно изменен');
+                    } catch (err) {
+                        alert(err.message);
+                    }
+                },
+                
+                exportData() {
+                    if (!this.profile) return;
+                    
+                    const dataStr = JSON.stringify(this.profile, null, 2);
+                    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                    const exportFileDefaultName = `skillmap-profile-${this.profile.id}.json`;
+                    
+                    const linkElement = document.createElement('a');
+                    linkElement.setAttribute('href', dataUri);
+                    linkElement.setAttribute('download', exportFileDefaultName);
+                    linkElement.click();
+                    
+                    this.showNotification('Данные экспортированы');
+                },
+                
+                showNotification(message) {
+                    const notification = document.createElement('div');
+                    notification.textContent = message;
+                    notification.className = 'fixed top-5 right-5 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full z-50';
+                    document.body.appendChild(notification);
+                    
+                    requestAnimationFrame(() => {
+                        notification.classList.remove('translate-x-full');
+                    });
+
+                    setTimeout(() => {
+                        notification.classList.add('translate-x-full');
+                        notification.addEventListener('transitionend', () => notification.remove());
+                    }, 4000);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
