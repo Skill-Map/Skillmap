@@ -442,3 +442,19 @@ class LessonAssignmentCreate(BaseModel):
     assigned_by: Optional[str] = None  # backend заполнит из current_user
     due_date: Optional[datetime] = None
     note: Optional[str] = None
+    
+    
+class TeacherCourseAssignmentCreate(BaseModel):
+    teacher_id: str
+    course_id: str
+
+class TeacherCourseAssignmentResponse(BaseModel):
+    id: UUID
+    teacher_id: str
+    course_id: str
+    assigned_by: str
+    assigned_at: datetime
+    status: str
+
+    class Config:
+        from_attributes = True
