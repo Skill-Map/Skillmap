@@ -33,7 +33,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 # 1. Админские роутеры (включая управление преподавателями)
 app.include_router(admin_router)
 app.include_router(admin_teachers_router)  # /api/teachers - для админов

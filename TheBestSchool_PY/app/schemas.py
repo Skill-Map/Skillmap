@@ -458,3 +458,27 @@ class TeacherCourseAssignmentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        
+class ModuleCreate(BaseModel):
+    course_id: str
+    title: str
+    order: int
+    description: Optional[str] = None
+    recommended_time: Optional[str] = None
+
+class ModuleUpdate(BaseModel):
+    title: Optional[str] = None
+    order: Optional[int] = None
+    description: Optional[str] = None
+    recommended_time: Optional[str] = None
+
+class LessonCreate(BaseModel):
+    module_id: str
+    title: str
+    order: int
+    description: Optional[str] = None
+
+class LessonUpdate(BaseModel):
+    title: Optional[str] = None
+    order: Optional[int] = None
+    description: Optional[str] = None

@@ -1,13 +1,17 @@
-# app/routers/teachers/teacher_panel.py
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, distinct
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
-import uuid
 import os
 import shutil
-
+from uuid import uuid4, UUID
+import asyncio
+from fastapi.responses import FileResponse
+import mimetypes
+import aiofiles
+import aiofiles.os as aios
+from sqlalchemy.orm import selectinload
 from database import get_db
 from auth import require_role
 import models
@@ -78,16 +82,36 @@ def _serialize_assignment(assignment: models.LessonAssignment,
     
     return data
 
-def save_file(f: UploadFile):
-    """Сохранение файла"""
+# app/routers/teachers/teacher_panel.py
+# app/routers/teachers/teacher_panel.py
+import aiofiles
+import aiofiles.os as aios
+
+async def save_file(f: UploadFile) -> Optional[str]:
+    """Асинхронное сохранение файла"""
     if not f:
         return None
-    ext = os.path.splitext(f.filename)[1]
-    name = f"{uuid.uuid4()}{ext}"
-    path = os.path.join(UPLOAD_DIR, name)
-    with open(path, "wb") as out:
-        shutil.copyfileobj(f.file, out)
-    return f"/uploads/{name}"
+    
+    try:
+        # Создаем папку, если ее нет
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        
+        ext = os.path.splitext(f.filename)[1]
+        name = f"{uuid4()}{ext}"
+        path = os.path.join(UPLOAD_DIR, name)
+        
+        # Асинхронная запись файла
+        async with aiofiles.open(path, "wb") as out:
+            content = await f.read()
+            await out.write(content)
+        
+        # Сбрасываем указатель файла на начало
+        await f.seek(0)
+        
+        return f"/uploads/{name}"
+    except Exception as e:
+        print(f"Ошибка сохранения файла {f.filename}: {e}")
+        return None
 
 # ============ ОСНОВНЫЕ ЭНДПОИНТЫ ============
 @router.get("/dashboard")
@@ -447,40 +471,6 @@ async def get_student_details(
         "assignments": assignments
     }
 
-@router.post("/lessons/courses/{course_id}/modules/{module_id}", status_code=201)
-async def create_lesson(
-    course_id: str,
-    module_id: str,
-    order: int = Form(...),
-    title: str = Form(...),
-    description: str = Form(None),
-    pptx_file: UploadFile = File(None),
-    homework_file: UploadFile = File(None),
-    db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(require_role("teacher"))
-):
-    """Создание нового урока"""
-    module = await db.scalar(
-        select(models.CourseModule)
-        .where(models.CourseModule.id == module_id)
-    )
-    if not module:
-        raise HTTPException(status_code=404, detail="Module not found")
-
-    lesson = models.CourseLesson(
-        module_id=module_id,
-        order=order,
-        title=title,
-        description=description,
-        pptx_url=save_file(pptx_file) if pptx_file else None,
-        homework_url=save_file(homework_file) if homework_file else None,
-    )
-
-    db.add(lesson)
-    await db.commit()
-    await db.refresh(lesson)
-
-    return lesson
 
 @router.get("/submissions/{assignment_id}")
 async def get_submissions(
@@ -547,3 +537,572 @@ async def _get_recent_activities(teacher_id: str, db: AsyncSession, limit: int =
     # Сортируем по дате и ограничиваем
     activities.sort(key=lambda x: x["date"] or "", reverse=True)
     return activities[:limit]
+
+# app/routers/teachers/teacher_panel.py - ДОБАВИТЬ ЭТИ ЭНДПОИНТЫ
+
+@router.get("/assigned-courses")
+async def get_assigned_courses(
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_role("teacher"))
+):
+    """Получить курсы, на которые назначен преподаватель"""
+    # Находим назначения преподавателя на курсы
+    assignments_result = await db.execute(
+        select(models.TeacherCourseAssignment)
+        .where(models.TeacherCourseAssignment.teacher_id == current_user.id)
+        .where(models.TeacherCourseAssignment.status == "active")
+    )
+    assignments = assignments_result.scalars().all()
+    
+    courses_data = []
+    for assignment in assignments:
+        course_result = await db.execute(
+            select(models.Course).where(models.Course.id == assignment.course_id)
+        )
+        course = course_result.scalar_one_or_none()
+        
+        if course:
+            # Считаем студентов на курсе
+            student_count_result = await db.execute(
+                select(func.count(models.UserCourseProgress.id))
+                .where(models.UserCourseProgress.course_id == course.id)
+            )
+            student_count = student_count_result.scalar() or 0
+            
+            # Считаем модули курса
+            module_count_result = await db.execute(
+                select(func.count(models.CourseModule.id))
+                .where(models.CourseModule.course_id == course.id)
+            )
+            module_count = module_count_result.scalar() or 0
+            
+            courses_data.append({
+                "id": str(course.id),
+                "name": course.name,
+                "description": course.description or "",
+                "category": course.category or "",
+                "category_name": course.category_name or "",
+                "category_color": course.category_color or "#1A535C",
+                "student_count": student_count,
+                "module_count": module_count,
+                "duration": course.duration or "",
+                "created_at": course.created_at.isoformat() if course.created_at else None,
+            })
+    
+    return courses_data
+
+@router.get("/modules")
+async def get_teacher_modules(
+    course_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_role("teacher"))
+):
+    """Получить модули курсов преподавателя"""
+    # Сначала получаем курсы преподавателя
+    assignments_result = await db.execute(
+        select(models.TeacherCourseAssignment.course_id)
+        .where(models.TeacherCourseAssignment.teacher_id == current_user.id)
+        .where(models.TeacherCourseAssignment.status == "active")
+    )
+    course_ids = [row[0] for row in assignments_result.all()]
+    
+    if not course_ids:
+        return []
+    
+    # Если указан конкретный курс, проверяем, что он принадлежит преподавателю
+    if course_id:
+        if UUID(course_id) not in course_ids:
+            raise HTTPException(status_code=403, detail="Нет доступа к этому курсу")
+        course_ids = [UUID(course_id)]
+    
+    # Получаем модули
+    query = select(
+        models.CourseModule,
+        models.Course.name.label("course_name")
+    ).join(
+        models.Course, models.CourseModule.course_id == models.Course.id
+    ).where(
+        models.CourseModule.course_id.in_(course_ids)
+    ).order_by(models.CourseModule.course_id, models.CourseModule.order)
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    modules = []
+    for module, course_name in rows:
+        # Считаем уроки в модуле
+        lesson_count_result = await db.execute(
+            select(func.count(models.CourseLesson.id))
+            .where(models.CourseLesson.module_id == module.id)
+        )
+        lesson_count = lesson_count_result.scalar() or 0
+        
+        modules.append({
+            "id": str(module.id),
+            "course_id": str(module.course_id),
+            "course_name": course_name,
+            "title": module.title,
+            "description": module.description or "",
+            "order": module.order,
+            "recommended_time": module.recommended_time or "",
+            "lesson_count": lesson_count,
+        })
+    
+    return modules
+
+@router.post("/modules", status_code=201)
+async def create_module(
+    payload: schemas.ModuleCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_role("teacher"))
+):
+    """Создать модуль в курсе преподавателя"""
+    # Проверяем, что преподаватель имеет доступ к курсу
+    assignment_result = await db.execute(
+        select(models.TeacherCourseAssignment)
+        .where(
+            models.TeacherCourseAssignment.teacher_id == current_user.id,
+            models.TeacherCourseAssignment.course_id == UUID(payload.course_id),
+            models.TeacherCourseAssignment.status == "active"
+        )
+    )
+    assignment = assignment_result.scalar_one_or_none()
+    
+    if not assignment:
+        raise HTTPException(status_code=403, detail="Нет доступа к этому курсу")
+    
+    # Проверяем существование курса
+    course_result = await db.execute(
+        select(models.Course).where(models.Course.id == UUID(payload.course_id))
+    )
+    course = course_result.scalar_one_or_none()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="Курс не найден")
+    
+    # Создаем модуль
+    module = models.CourseModule(
+        course_id=UUID(payload.course_id),
+        title=payload.title,
+        order=payload.order,
+        description=payload.description,
+        recommended_time=payload.recommended_time
+    )
+    
+    db.add(module)
+    await db.commit()
+    await db.refresh(module)
+    
+    return {
+        "id": str(module.id),
+        "course_id": str(module.course_id),
+        "title": module.title,
+        "description": module.description,
+        "order": module.order,
+        "recommended_time": module.recommended_time
+    }
+
+@router.get("/lessons")
+async def get_teacher_lessons(
+    course_id: Optional[str] = Query(None),
+    module_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_role("teacher"))
+):
+    """Получить уроки преподавателя"""
+    # Получаем курсы преподавателя
+    assignments_result = await db.execute(
+        select(models.TeacherCourseAssignment.course_id)
+        .where(models.TeacherCourseAssignment.teacher_id == current_user.id)
+        .where(models.TeacherCourseAssignment.status == "active")
+    )
+    teacher_course_ids = [row[0] for row in assignments_result.all()]
+    
+    if not teacher_course_ids:
+        return []
+    
+    # Построение запроса С ПРЕДВАРИТЕЛЬНОЙ ЗАГРУЗКОЙ
+    query = select(
+        models.CourseLesson
+    ).options(
+        selectinload(models.CourseLesson.module).selectinload(models.CourseModule.course)
+    ).join(
+        models.CourseModule, models.CourseLesson.module_id == models.CourseModule.id
+    ).join(
+        models.Course, models.CourseModule.course_id == models.Course.id
+    ).where(
+        models.CourseModule.course_id.in_(teacher_course_ids)
+    )
+    
+    # Фильтры
+    if course_id:
+        query = query.where(models.CourseModule.course_id == UUID(course_id))
+    
+    if module_id:
+        query = query.where(models.CourseLesson.module_id == UUID(module_id))
+    
+    query = query.order_by(models.CourseLesson.module_id, models.CourseLesson.order)
+    
+    result = await db.execute(query)
+    lessons = result.scalars().all()
+    
+    # Теперь можно безопасно обращаться к связанным данным
+    serialized_lessons = []
+    for lesson in lessons:
+        serialized_lessons.append({
+            "id": str(lesson.id),
+            "module_id": str(lesson.module_id),
+            "module_title": lesson.module.title if lesson.module else "",
+            "course_id": str(lesson.module.course_id) if lesson.module else "",
+            "course_name": lesson.module.course.name if lesson.module and lesson.module.course else "",
+            "title": lesson.title,
+            "description": lesson.description or "",
+            "order": lesson.order,
+            "pptx_url": lesson.pptx_url,
+            "homework_url": lesson.homework_url,
+        })
+    
+    return serialized_lessons
+
+@router.get("/course-students")
+async def get_course_students(
+    course_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_role("teacher"))
+):
+    """Получить студентов на курсах преподавателя"""
+    # Получаем курсы преподавателя
+    assignments_result = await db.execute(
+        select(models.TeacherCourseAssignment.course_id)
+        .where(models.TeacherCourseAssignment.teacher_id == current_user.id)
+        .where(models.TeacherCourseAssignment.status == "active")
+    )
+    teacher_course_ids = [row[0] for row in assignments_result.all()]
+    
+    if not teacher_course_ids:
+        return []
+    
+    # Если указан курс, проверяем доступ
+    if course_id:
+        course_uuid = UUID(course_id)
+        if course_uuid not in teacher_course_ids:
+            raise HTTPException(status_code=403, detail="Нет доступа к этому курсу")
+        teacher_course_ids = [course_uuid]
+    
+    # Получаем студентов на курсах преподавателя
+    query = select(
+        models.User,
+        models.UserCourseProgress.course_id,
+        models.UserCourseProgress.progress_percent
+    ).join(
+        models.UserCourseProgress, models.User.id == models.UserCourseProgress.user_id
+    ).where(
+        models.UserCourseProgress.course_id.in_(teacher_course_ids),
+        models.User.type == "apprentice"
+    )
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    students = []
+    for user, progress_course_id, progress_percent in rows:
+        # Получаем название курса
+        course_result = await db.execute(
+            select(models.Course.name)
+            .where(models.Course.id == progress_course_id)
+        )
+        course_name = course_result.scalar_one_or_none() or ""
+        
+        students.append({
+            "id": str(user.id),
+            "email": user.email,
+            "name": user.name or "",
+            "surname": user.surname or "",
+            "patronymic": user.patronymic or "",
+            "phone": user.phone or "",
+            "group_code": user.group_code or "",
+            "status": user.status or "active",
+            "course_id": str(progress_course_id),
+            "course_name": course_name,
+            "progress_percent": progress_percent or 0,
+        })
+    
+    return students
+
+
+# В teacher_panel.py добавьте или измените следующие эндпоинты:
+
+# ============ УРОКИ ============
+
+@router.post("/lessons")
+async def create_lesson(
+    module_id: str = Form(...),
+    order: int = Form(...),
+    title: str = Form(...),
+    description: str = Form(None),
+    pptx_file: UploadFile = File(None),
+    homework_file: UploadFile = File(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_role("teacher"))
+):
+    """Создать урок в модуле"""
+    try:
+        module_uuid = UUID(module_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Неверный формат ID модуля")
+    
+    # Получаем модуль
+    module_result = await db.execute(
+        select(models.CourseModule).where(models.CourseModule.id == module_uuid)
+    )
+    module = module_result.scalar_one_or_none()
+    
+    if not module:
+        raise HTTPException(status_code=404, detail="Модуль не найден")
+    
+    # Проверяем доступ преподавателя к курсу
+    assignment_result = await db.execute(
+        select(models.TeacherCourseAssignment).where(
+            models.TeacherCourseAssignment.teacher_id == current_user.id,
+            models.TeacherCourseAssignment.course_id == module.course_id,
+            models.TeacherCourseAssignment.status == "active"
+        )
+    )
+    assignment = assignment_result.scalar_one_or_none()
+    
+    if not assignment:
+        raise HTTPException(status_code=403, detail="Нет доступа к этому курсу")
+    
+    # Проверяем, нет ли уже урока с таким порядком в этом модуле
+    existing_lesson_result = await db.execute(
+        select(models.CourseLesson).where(
+            models.CourseLesson.module_id == module_uuid,
+            models.CourseLesson.order == order
+        )
+    )
+    existing_lesson = existing_lesson_result.scalar_one_or_none()
+    
+    if existing_lesson:
+        raise HTTPException(
+            status_code=400, 
+            detail="Урок с таким порядковым номером уже существует в этом модуле"
+        )
+    
+    try:
+        # Асинхронно сохраняем файлы
+        pptx_url = None
+        homework_url = None
+        
+        if pptx_file:
+            pptx_url = await save_file(pptx_file)
+        
+        if homework_file:
+            homework_url = await save_file(homework_file)
+        
+        # Создаем урок
+        lesson = models.CourseLesson(
+            module_id=module_uuid,
+            order=order,
+            title=title,
+            description=description,
+            pptx_url=pptx_url,
+            homework_url=homework_url,
+        )
+        
+        db.add(lesson)
+        await db.commit()
+        await db.refresh(lesson)
+        
+        return {
+            "id": str(lesson.id),
+            "module_id": str(lesson.module_id),
+            "title": lesson.title,
+            "description": lesson.description,
+            "order": lesson.order,
+            "pptx_url": lesson.pptx_url,
+            "homework_url": lesson.homework_url,
+        }
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Ошибка при создании урока: {str(e)}")
+
+@router.get("/lessons/{lesson_id}")
+async def get_lesson(
+    lesson_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_role("teacher"))
+):
+    """Получить информацию об уроке"""
+    try:
+        lesson_uuid = UUID(lesson_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Неверный формат ID урока")
+    
+    # Получаем урок
+    lesson_result = await db.execute(
+        select(
+            models.CourseLesson,
+            models.CourseModule,
+            models.Course
+        )
+        .join(models.CourseModule, models.CourseLesson.module_id == models.CourseModule.id)
+        .join(models.Course, models.CourseModule.course_id == models.Course.id)
+        .where(models.CourseLesson.id == lesson_uuid)
+    )
+    
+    row = lesson_result.first()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Урок не найден")
+    
+    lesson, module, course = row
+    
+    # Проверяем доступ преподавателя к курсу
+    assignment_result = await db.execute(
+        select(models.TeacherCourseAssignment).where(
+            models.TeacherCourseAssignment.teacher_id == current_user.id,
+            models.TeacherCourseAssignment.course_id == course.id,
+            models.TeacherCourseAssignment.status == "active"
+        )
+    )
+    assignment = assignment_result.scalar_one_or_none()
+    
+    if not assignment:
+        raise HTTPException(status_code=403, detail="Нет доступа к этому уроку")
+    
+    return {
+        "id": str(lesson.id),
+        "module_id": str(lesson.module_id),
+        "course_id": str(course.id),
+        "title": lesson.title,
+        "description": lesson.description,
+        "order": lesson.order,
+        "pptx_url": lesson.pptx_url,
+        "homework_url": lesson.homework_url,
+        "course_name": course.name,
+        "module_title": module.title
+    }
+
+@router.put("/lessons/{lesson_id}")
+async def update_lesson(
+    lesson_id: str,
+    order: int = Form(None),
+    title: str = Form(None),
+    description: str = Form(None),
+    pptx_file: UploadFile = File(None),
+    homework_file: UploadFile = File(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_role("teacher"))
+):
+    """Обновить урок"""
+    try:
+        lesson_uuid = UUID(lesson_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Неверный формат ID урока")
+    
+    # Получаем урок
+    lesson_result = await db.execute(
+        select(
+            models.CourseLesson,
+            models.CourseModule,
+            models.Course
+        )
+        .join(models.CourseModule, models.CourseLesson.module_id == models.CourseModule.id)
+        .join(models.Course, models.CourseModule.course_id == models.Course.id)
+        .where(models.CourseLesson.id == lesson_uuid)
+    )
+    
+    row = lesson_result.first()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Урок не найден")
+    
+    lesson, module, course = row
+    
+    # Проверяем доступ преподавателя к курсу
+    assignment_result = await db.execute(
+        select(models.TeacherCourseAssignment).where(
+            models.TeacherCourseAssignment.teacher_id == current_user.id,
+            models.TeacherCourseAssignment.course_id == course.id,
+            models.TeacherCourseAssignment.status == "active"
+        )
+    )
+    assignment = assignment_result.scalar_one_or_none()
+    
+    if not assignment:
+        raise HTTPException(status_code=403, detail="Нет доступа к этому уроку")
+    
+    try:
+        # Обновляем поля
+        if title is not None:
+            lesson.title = title
+        if order is not None:
+            # Проверяем, нет ли другого урока с таким порядком в этом модуле
+            if order != lesson.order:
+                existing_lesson_result = await db.execute(
+                    select(models.CourseLesson).where(
+                        models.CourseLesson.module_id == module.id,
+                        models.CourseLesson.order == order,
+                        models.CourseLesson.id != lesson.id
+                    )
+                )
+                existing_lesson = existing_lesson_result.scalar_one_or_none()
+                
+                if existing_lesson:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Урок с таким порядковым номером уже существует в этом модуле"
+                    )
+                lesson.order = order
+        if description is not None:
+            lesson.description = description
+        
+        # Асинхронно сохраняем файлы
+        if pptx_file:
+            lesson.pptx_url = await save_file(pptx_file)
+        if homework_file:
+            lesson.homework_url = await save_file(homework_file)
+        
+        await db.commit()
+        await db.refresh(lesson)
+        
+        return {
+            "id": str(lesson.id),
+            "module_id": str(lesson.module_id),
+            "title": lesson.title,
+            "description": lesson.description,
+            "order": lesson.order,
+            "pptx_url": lesson.pptx_url,
+            "homework_url": lesson.homework_url
+        }
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Ошибка при обновлении урока: {str(e)}")
+    
+@router.get("/download/{filename:path}")
+async def download_file(
+    filename: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_role("teacher"))
+):
+    """Скачать файл из папки uploads"""
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    
+    # Проверяем, существует ли файл
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    
+    # Определяем MIME-тип файла
+    mime_type, _ = mimetypes.guess_type(file_path)
+    if mime_type is None:
+        mime_type = "application/octet-stream"
+    
+    # Возвращаем файл с правильными заголовками
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type=mime_type,
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )

@@ -28,13 +28,14 @@ pwd_context = CryptContext(
     deprecated="auto"
 )
 
-def get_password_hash(password: str) -> str:
-    """Хэширование пароля"""
-    return pwd_context.hash(password)
-
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Проверка пароля"""
-    return pwd_context.verify(plain_password, hashed_password)
+    """Упрощенная проверка пароля"""
+    print(f"DEBUG: Проверка пароля '{plain_password}' == '{hashed_password}'")
+    return plain_password == hashed_password
+
+def get_password_hash(password: str) -> str:
+    """Возвращаем пароль как есть"""
+    return password
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Создание JWT токена"""
