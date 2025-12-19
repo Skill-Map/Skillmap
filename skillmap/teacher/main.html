@@ -1,327 +1,787 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Панель преподавателя — Skillmap</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель преподавателя — Skillmap</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #1A535C;
+            --secondary: #F2C14E;
+        }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    </style>
 </head>
 <body class="bg-gray-50" x-data="teacherApp()" x-init="init()">
 
-  <!-- Header -->
-  <header class="bg-white border-b shadow-sm">
-    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-4">
-        <a href="/dashboard" class="font-bold text-lg text-gray-900">Skillmap</a>
-        <nav class="hidden md:flex gap-4 text-sm text-gray-600">
-          <a href="/dashboard">Дашборд</a>
-          <a href="/courses">Курсы</a>
-        </nav>
-      </div>
-      <div class="flex items-center gap-4">
-        <!-- безопасно показываем имя -->
-        <div class="text-sm text-gray-700" x-text="teacher && teacher.name ? teacher.name : ''"></div>
-        <button @click="logout()" class="px-3 py-2 border rounded text-[color:var(--primary)]">Выйти</button>
-      </div>
+    <!-- Загрузчик -->
+    <div x-show="loading" class="fixed inset-0 bg-white/80 flex items-center justify-center z-50">
+        <div class="loader"></div>
     </div>
-  </header>
 
-  <main class="max-w-7xl mx-auto p-6">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Статистика -->
-      <div class="bg-white p-4 rounded-xl shadow-sm">
-        <h3 class="font-semibold text-lg">Статистика</h3>
-        <div class="mt-4 space-y-3 text-sm">
-          <div>Студентов: <span class="font-semibold" x-text="stats.students_count"></span></div>
-          <div>Курсов (у студентов): <span class="font-semibold" x-text="stats.courses_count"></span></div>
-          <div>Средний прогресс: <span class="font-semibold" x-text="stats.avg_progress + '%'"></span></div>
-        </div>
-      </div>
-
-      <!-- Список студентов -->
-      <div class="bg-white p-4 rounded-xl shadow-sm lg:col-span-2">
-        <div class="flex items-center justify-between">
-          <h3 class="font-semibold text-lg">Мои студенты</h3>
-          <div class="text-sm text-gray-500">Кол-во: <span x-text="students.length"></span></div>
-        </div>
-
-        <div class="mt-4">
-          <input type="text" x-model="filter" placeholder="Поиск студента..." class="w-full px-3 py-2 border rounded-lg" />
-        </div>
-
-        <div class="mt-4 space-y-3">
-          <template x-for="s in filteredStudents" :key="s.id">
-            <div class="flex items-center justify-between border rounded-lg p-3">
-              <div>
-                <div class="font-medium" x-text="s.name"></div>
-                <div class="text-xs text-gray-500" x-text="s.email"></div>
-              </div>
-              <div class="flex items-center gap-3">
-                <div class="text-sm text-gray-600">Курсов: <span class="font-semibold" x-text="s.course_count"></span></div>
-                <div class="text-sm text-gray-600">Прогресс: <span class="font-semibold" x-text="s.avg_progress + '%'"></span></div>
-                <button @click="selectStudent(s)" class="px-3 py-1 border rounded text-sm">Открыть</button>
-              </div>
+    <!-- Если нет доступа -->
+    <div x-show="!loading && !isTeacher" x-cloak class="fixed inset-0 bg-white flex items-center justify-center z-50">
+        <div class="text-center p-8">
+            <div class="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+                <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
             </div>
-          </template>
+            <h2 class="text-xl font-bold text-gray-900 mb-2">Доступ запрещен</h2>
+            <p class="text-gray-600 mb-6">У вас нет прав доступа к панели преподавателя.</p>
+            <a href="../index.html" class="px-6 py-3 bg-[#1A535C] text-white rounded-lg hover:bg-opacity-90 transition font-medium">
+                Вернуться на главную
+            </a>
         </div>
-      </div>
     </div>
 
-    <!-- Панель выбранного студента: показываем только если selectedStudent не null -->
-    <div class="mt-6" x-show="selectedStudent != null">
-      <div class="bg-white p-4 rounded-xl shadow-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <!-- безопасный вывод: если selectedStudent отсутствует, выведется пустая строка -->
-            <h3 class="font-semibold text-lg" x-text="selectedStudent ? selectedStudent.name : ''"></h3>
-            <div class="text-xs text-gray-500" x-text="selectedStudent ? selectedStudent.email : ''"></div>
-          </div>
-          <div class="flex items-center gap-2">
-            <button @click="openCreateLesson()" class="px-4 py-2 bg-blue-600 text-white rounded">Добавить урок</button>
-            <button @click="loadAssignments(selectedStudent.id)" class="px-4 py-2 border rounded">Показать назначения</button>
-          </div>
-        </div>
-
-        <div class="mt-4">
-          <h4 class="font-medium">Назначенные уроки</h4>
-          <div class="mt-3 space-y-2">
-            <template x-for="a in assignments" :key="a.id">
-              <div class="border rounded p-3 flex items-start justify-between">
-                <div>
-                  <div class="font-semibold" x-text="a.lesson_title || ('Урок: ' + a.lesson_id)"></div>
-                  <div class="text-xs text-gray-500">Статус: <span x-text="a.status"></span></div>
-                  <div class="text-xs text-gray-500" x-text="a.note || ''"></div>
+    <!-- Основной контент (только для преподавателей) -->
+    <div x-show="!loading && isTeacher" x-cloak>
+        <!-- Header -->
+        <header class="bg-white border-b shadow-sm">
+            <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-[#1A535C] flex items-center justify-center text-white font-bold">SM</div>
+                        <div class="font-bold text-lg text-gray-900">Skillmap Teacher</div>
+                    </div>
+                    <nav class="hidden md:flex gap-4 text-sm text-gray-600">
+                        <a href="#" @click.prevent="currentTab = 'dashboard'" 
+                           :class="currentTab === 'dashboard' ? 'text-[#1A535C] font-medium' : 'hover:text-[#1A535C]'">
+                            <i class="fas fa-tachometer-alt mr-1"></i>Дашборд
+                        </a>
+                        <a href="#" @click.prevent="currentTab = 'courses'" 
+                           :class="currentTab === 'courses' ? 'text-[#1A535C] font-medium' : 'hover:text-[#1A535C]'">
+                            <i class="fas fa-book mr-1"></i>Мои курсы
+                        </a>
+                        <a href="#" @click.prevent="currentTab = 'students'" 
+                           :class="currentTab === 'students' ? 'text-[#1A535C] font-medium' : 'hover:text-[#1A535C]'">
+                            <i class="fas fa-users mr-1"></i>Студенты
+                        </a>
+                        <a href="#" @click.prevent="currentTab = 'assignments'" 
+                           :class="currentTab === 'assignments' ? 'text-[#1A535C] font-medium' : 'hover:text-[#1A535C]'">
+                            <i class="fas fa-tasks mr-1"></i>Назначения
+                        </a>
+                    </nav>
                 </div>
-                <div class="flex items-center gap-2">
-                  <a :href="a.pptx_url" target="_blank" class="text-xs px-3 py-1 bg-blue-600 text-white rounded" x-show="a.pptx_url">PPTX</a>
-                  <a :href="a.homework_url" target="_blank" class="text-xs px-3 py-1 bg-purple-600 text-white rounded" x-show="a.homework_url">DOCX</a>
+                <div class="flex items-center gap-4">
+                    <div class="text-sm text-gray-700">
+                        <span x-text="teacherData ? teacherData.name + ' ' + teacherData.surname : ''"></span>
+                        <div class="text-xs text-gray-500" x-text="teacherData ? teacherData.title || 'Преподаватель' : ''"></div>
+                    </div>
+                    <button @click="logout()" 
+                            class="px-3 py-2 border border-[#1A535C] text-[#1A535C] rounded-md hover:bg-[#1A535C] hover:text-white transition">
+                        Выйти
+                    </button>
                 </div>
-              </div>
-            </template>
-            <div x-show="assignments.length === 0" class="text-sm text-gray-500">Пока назначений нет.</div>
-          </div>
-        </div>
-      </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto p-6">
+            <!-- Заголовок -->
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">
+                    <span x-text="currentTab === 'dashboard' ? 'Дашборд' : 
+                                 currentTab === 'courses' ? 'Мои курсы' : 
+                                 currentTab === 'students' ? 'Мои студенты' : 
+                                 'Назначения'"></span>
+                </h1>
+                <p class="text-gray-600" x-text="currentTab === 'dashboard' ? 'Обзор вашей преподавательской деятельности' : 
+                                                   currentTab === 'courses' ? 'Управление вашими курсами' : 
+                                                   currentTab === 'students' ? 'Студенты, обучающиеся на ваших курсах' : 
+                                                   'Задания, назначенные вашим студентам'"></p>
+            </div>
+
+            <!-- Дашборд -->
+            <div x-show="currentTab === 'dashboard'" class="space-y-6">
+                <!-- Статистика -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mr-4">
+                                <i class="fas fa-book text-blue-600"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Мои курсы</p>
+                                <p class="text-2xl font-bold text-gray-900" x-text="stats.courses || 0"></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-xl shadow-sm border">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center mr-4">
+                                <i class="fas fa-users text-green-600"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Мои студенты</p>
+                                <p class="text-2xl font-bold text-gray-900" x-text="stats.students || 0"></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-xl shadow-sm border">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center mr-4">
+                                <i class="fas fa-tasks text-purple-600"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Заданий назначено</p>
+                                <p class="text-2xl font-bold text-gray-900" x-text="stats.assignments || 0"></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-xl shadow-sm border">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 rounded-lg bg-yellow-100 flex items-center justify-center mr-4">
+                                <i class="fas fa-chart-line text-yellow-600"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Средний прогресс</p>
+                                <p class="text-2xl font-bold text-gray-900" x-text="(stats.avg_progress || 0) + '%'"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Быстрые действия -->
+                <div class="bg-white rounded-xl shadow-sm border p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Быстрые действия</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button @click="currentTab = 'assignments'; openCreateAssignment()" 
+                                class="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-left">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mr-3">
+                                    <i class="fas fa-plus text-blue-600"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-900">Назначить задание</p>
+                                    <p class="text-sm text-gray-500">Создать новое задание</p>
+                                </div>
+                            </div>
+                        </button>
+                        
+                        <button @click="currentTab = 'courses'; openCreateCourse()" 
+                                class="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-left">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center mr-3">
+                                    <i class="fas fa-book text-green-600"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-900">Создать курс</p>
+                                    <p class="text-sm text-gray-500">Добавить новый курс</p>
+                                </div>
+                            </div>
+                        </button>
+                        
+                        <a href="/admin.html" target="_blank" 
+                           class="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-left">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center mr-3">
+                                    <i class="fas fa-cog text-purple-600"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-900">Панель администратора</p>
+                                    <p class="text-sm text-gray-500">Расширенное управление</p>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Последние активности -->
+                <div class="bg-white rounded-xl shadow-sm border p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900">Последние активности</h3>
+                        <button @click="loadRecentActivities()" class="text-sm text-[#1A535C] hover:text-[#1A535C]/80">
+                            <i class="fas fa-sync-alt mr-1"></i>Обновить
+                        </button>
+                    </div>
+                    <div class="space-y-3">
+                        <template x-for="activity in recentActivities" :key="activity.id">
+                            <div class="flex items-start border-b pb-3 last:border-0">
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center mr-3 mt-1"
+                                     :class="activity.color === 'text-blue-600' ? 'bg-blue-100' : 
+                                             activity.color === 'text-green-600' ? 'bg-green-100' : 'bg-gray-100'">
+                                    <i class="fas" :class="activity.icon" :class="activity.color"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm text-gray-900" x-text="activity.message"></p>
+                                    <p class="text-xs text-gray-500 mt-1" x-text="formatDate(activity.date, true)"></p>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="recentActivities.length === 0" class="text-center py-8 text-gray-500">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>Пока нет активностей</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Мои курсы -->
+            <div x-show="currentTab === 'courses'" class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-gray-900">Мои курсы</h2>
+                    <div class="flex items-center gap-3">
+                        <button @click="loadCourses()" 
+                                class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+                            <i class="fas fa-sync-alt mr-2"></i>Обновить
+                        </button>
+                        <button @click="openCreateCourse()" 
+                                class="px-4 py-2 bg-[#1A535C] text-white rounded-lg hover:bg-opacity-90 transition font-medium">
+                            <i class="fas fa-plus mr-2"></i>Создать курс
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <template x-for="course in courses" :key="course.id">
+                        <div class="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition">
+                            <div class="p-5">
+                                <div class="flex items-start justify-between mb-4">
+                                    <div class="flex-1">
+                                        <h3 class="font-bold text-gray-900 text-lg mb-1" x-text="course.name"></h3>
+                                        <p class="text-sm text-gray-500 mb-2" x-text="course.category_name || 'Без категории'"></p>
+                                        <div class="flex flex-wrap gap-2">
+                                            <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700">
+                                                <i class="fas fa-users mr-1"></i>
+                                                <span x-text="course.student_count"></span> студентов
+                                            </span>
+                                            <span class="px-2 py-1 text-xs rounded-full" 
+                                                  :class="course.is_public ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'">
+                                                <span x-text="course.is_public ? 'Публичный' : 'Приватный'"></span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-600 mb-4 line-clamp-2" x-text="course.description || 'Описание отсутствует'"></p>
+                                
+                                <div class="flex space-x-2">
+                                    <button @click="viewCourse(course.id)" 
+                                            class="flex-1 px-3 py-2 border border-gray-300 text-sm rounded-lg hover:bg-gray-50 transition flex items-center justify-center">
+                                        <i class="fas fa-eye mr-2"></i>Просмотр
+                                    </button>
+                                    <button @click="editCourse(course.id)" 
+                                            class="flex-1 px-3 py-2 bg-[#1A535C] text-white text-sm rounded-lg hover:bg-opacity-90 transition flex items-center justify-center">
+                                        <i class="fas fa-edit mr-2"></i>Изменить
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <div x-show="courses.length === 0" class="col-span-3 py-12 text-center">
+                        <div class="w-20 h-20 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-book text-gray-400 text-2xl"></i>
+                        </div>
+                        <p class="text-gray-500 font-medium text-lg mb-2">У вас пока нет курсов</p>
+                        <p class="text-gray-400 mb-6">Создайте первый курс или свяжитесь с администратором для назначения курсов</p>
+                        <button @click="openCreateCourse()" 
+                                class="px-6 py-3 bg-[#1A535C] text-white rounded-lg hover:bg-opacity-90 transition font-medium flex items-center mx-auto">
+                            <i class="fas fa-plus mr-2"></i>Создать первый курс
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Мои студенты -->
+            <div x-show="currentTab === 'students'" class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-gray-900">Мои студенты</h2>
+                    <div class="flex items-center gap-3">
+                        <button @click="loadStudents()" 
+                                class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+                            <i class="fas fa-sync-alt mr-2"></i>Обновить
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Поиск студентов -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border">
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" 
+                               x-model="studentSearch" 
+                               placeholder="Поиск студента по имени, фамилии, email или телефону..."
+                               class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A535C]">
+                    </div>
+                </div>
+
+                <!-- Таблица студентов -->
+                <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="bg-gray-50 border-b">
+                                    <th class="text-left p-4 text-sm font-medium text-gray-700">Студент</th>
+                                    <th class="text-left p-4 text-sm font-medium text-gray-700">Email</th>
+                                    <th class="text-left p-4 text-sm font-medium text-gray-700">Телефон</th>
+                                    <th class="text-left p-4 text-sm font-medium text-gray-700">Курсы</th>
+                                    <th class="text-left p-4 text-sm font-medium text-gray-700">Прогресс</th>
+                                    <th class="text-left p-4 text-sm font-medium text-gray-700">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="student in filteredStudents" :key="student.id">
+                                    <tr class="border-b hover:bg-gray-50 transition">
+                                        <td class="p-4">
+                                            <div class="font-medium text-gray-900">
+                                                <span x-text="student.surname + ' ' + student.name"></span>
+                                                <span x-show="student.patronymic" x-text="' ' + student.patronymic"></span>
+                                            </div>
+                                            <div class="text-xs text-gray-500 mt-1" x-text="student.group_code || 'Группа не указана'"></div>
+                                        </td>
+                                        <td class="p-4 text-gray-900" x-text="student.email"></td>
+                                        <td class="p-4">
+                                            <span class="text-sm text-gray-900" x-text="student.phone || 'Не указан'"></span>
+                                        </td>
+                                        <td class="p-4">
+                                            <span class="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                                                <span x-text="student.course_count || 0"></span>
+                                            </span>
+                                        </td>
+                                        <td class="p-4">
+                                            <div class="flex items-center">
+                                                <div class="w-24 bg-gray-200 rounded-full h-2 mr-2">
+                                                    <div class="bg-green-600 h-2 rounded-full" 
+                                                         :style="'width: ' + (student.avg_progress || 0) + '%'"></div>
+                                                </div>
+                                                <span class="text-sm text-gray-700" x-text="(student.avg_progress || 0) + '%'"></span>
+                                            </div>
+                                        </td>
+                                        <td class="p-4">
+                                            <button @click="viewStudent(student.id)" 
+                                                    class="px-3 py-1.5 border border-gray-300 text-sm rounded-lg hover:bg-gray-50 transition flex items-center">
+                                                <i class="fas fa-eye mr-1.5"></i>
+                                                <span>Просмотр</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                
+                                <tr x-show="filteredStudents.length === 0">
+                                    <td colspan="6" class="p-8 text-center">
+                                        <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-users text-gray-400 text-xl"></i>
+                                        </div>
+                                        <p class="text-gray-500 font-medium">Студенты не найдены</p>
+                                        <p class="text-gray-400 text-sm mt-2" x-show="studentSearch">Попробуйте изменить поисковый запрос</p>
+                                        <p class="text-gray-400 text-sm mt-2" x-show="!studentSearch && students.length === 0">На ваших курсах пока нет студентов</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Назначения -->
+            <div x-show="currentTab === 'assignments'" class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-gray-900">Назначения</h2>
+                    <div class="flex items-center gap-3">
+                        <button @click="loadAssignments()" 
+                                class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+                            <i class="fas fa-sync-alt mr-2"></i>Обновить
+                        </button>
+                        <button @click="openCreateAssignment()" 
+                                class="px-4 py-2 bg-[#1A535C] text-white rounded-lg hover:bg-opacity-90 transition font-medium">
+                            <i class="fas fa-plus mr-2"></i>Новое назначение
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Фильтры -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Фильтр по статусу</label>
+                            <select x-model="assignmentFilter" 
+                                    class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A535C]">
+                                <option value="">Все статусы</option>
+                                <option value="assigned">Назначено</option>
+                                <option value="in_progress">В работе</option>
+                                <option value="completed">Завершено</option>
+                                <option value="reviewed">Проверено</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Поиск</label>
+                            <input type="text" 
+                                   x-model="assignmentSearch" 
+                                   placeholder="Поиск по студенту или уроку..."
+                                   class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A535C]">
+                        </div>
+                        <div class="flex items-end">
+                            <button @click="resetFilters()" 
+                                    class="w-full px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium">
+                                <i class="fas fa-times mr-2"></i>Сбросить фильтры
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Сетка назначений -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <template x-for="assignment in filteredAssignments" :key="assignment.id">
+                        <div class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md transition">
+                            <div class="flex items-start justify-between mb-3">
+                                <div class="flex-1">
+                                    <h3 class="font-bold text-gray-900 mb-1" x-text="assignment.lesson_title || 'Без названия'"></h3>
+                                    <p class="text-sm text-gray-500 mb-2" x-text="assignment.student_name"></p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span class="px-2 py-1 text-xs rounded-full"
+                                              :class="assignment.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                                                      assignment.status === 'in_progress' ? 'bg-blue-100 text-blue-800' : 
+                                                      assignment.status === 'reviewed' ? 'bg-purple-100 text-purple-800' : 
+                                                      'bg-yellow-100 text-yellow-800'">
+                                            <span x-text="assignment.status === 'completed' ? 'Завершено' : 
+                                                         assignment.status === 'in_progress' ? 'В работе' : 
+                                                         assignment.status === 'reviewed' ? 'Проверено' : 
+                                                         'Назначено'"></span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <p class="text-sm text-gray-600 mb-4 line-clamp-2" x-text="assignment.lesson_description || 'Без описания'"></p>
+                            
+                            <div class="flex justify-between text-xs text-gray-500 mb-4">
+                                <div>
+                                    <i class="fas fa-calendar mr-1"></i>
+                                    <span x-text="formatDate(assignment.assigned_at, true)"></span>
+                                </div>
+                                <div>
+                                    <i class="fas fa-clock mr-1"></i>
+                                    <span x-text="assignment.due_date ? formatDate(assignment.due_date, true) : 'Без срока'"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="flex space-x-2">
+                                <a :href="assignment.pptx_url" target="_blank" x-show="assignment.pptx_url" 
+                                   class="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition text-center">
+                                    <i class="fas fa-file-powerpoint mr-1"></i>PPTX
+                                </a>
+                                <a :href="assignment.homework_url" target="_blank" x-show="assignment.homework_url" 
+                                   class="flex-1 px-3 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition text-center">
+                                    <i class="fas fa-file-word mr-1"></i>DOCX
+                                </a>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <div x-show="filteredAssignments.length === 0" class="col-span-3 py-12 text-center">
+                        <div class="w-20 h-20 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-tasks text-gray-400 text-2xl"></i>
+                        </div>
+                        <p class="text-gray-500 font-medium text-lg mb-2">Нет назначенных заданий</p>
+                        <p class="text-gray-400 mb-6">Создайте первое задание для ваших студентов</p>
+                        <button @click="openCreateAssignment()" 
+                                class="px-6 py-3 bg-[#1A535C] text-white rounded-lg hover:bg-opacity-90 transition font-medium flex items-center mx-auto">
+                            <i class="fas fa-plus mr-2"></i>Создать первое задание
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
-  </main>
-
-  <!-- МОДАЛ: Создать урок (добавить в модуль и сразу назначить студенту) -->
-  <div x-show="createLessonModal.open" x-cloak class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl w-full max-w-2xl p-6">
-      <div class="flex items-center justify-between">
-        <h3 class="text-lg font-semibold">Создать урок и назначить студенту</h3>
-        <button @click="closeCreateLesson()" class="text-gray-400">✕</button>
-      </div>
-
-      <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div>
-          <label class="text-sm">Курс</label>
-          <select x-model="form.course_id" class="w-full border rounded px-3 py-2" @change="loadModulesForCourse()">
-            <option value="">Выберите курс</option>
-            <template x-for="c in courses" :key="c.id">
-              <option :value="c.id" x-text="c.name"></option>
-            </template>
-          </select>
-        </div>
-        <div>
-          <label class="text-sm">Модуль</label>
-          <select x-model="form.module_id" class="w-full border rounded px-3 py-2">
-            <option value="">Выберите модуль</option>
-            <template x-for="m in modules" :key="m.id">
-              <option :value="m.id" x-text="m.title"></option>
-            </template>
-          </select>
-        </div>
-
-        <div>
-          <label class="text-sm">Порядок</label>
-          <input type="number" x-model="form.order" class="w-full border rounded px-3 py-2" />
-        </div>
-        <div>
-          <label class="text-sm">Заголовок урока</label>
-          <input type="text" x-model="form.title" class="w-full border rounded px-3 py-2" />
-        </div>
-
-        <div class="md:col-span-2">
-          <label class="text-sm">Описание</label>
-          <textarea x-model="form.description" class="w-full border rounded px-3 py-2"></textarea>
-        </div>
-
-        <div>
-          <label class="text-sm">Презентация (.pptx)</label>
-          <input type="file" id="pptxFile" class="w-full" />
-        </div>
-        <div>
-          <label class="text-sm">Домашка (.docx)</label>
-          <input type="file" id="homeworkFile" class="w-full" />
-        </div>
-      </div>
-
-      <div class="mt-4 flex justify-end gap-3">
-        <button @click="closeCreateLesson()" class="px-4 py-2 border rounded">Отмена</button>
-        <button @click="createLessonAndAssign()" class="px-4 py-2 bg-blue-600 text-white rounded">Создать и назначить</button>
-      </div>
-    </div>
-  </div>
 
 <script>
-function teacherApp(){
-  // <- Укажи здесь URL бэкенда. Если backend слушает на 8082, не забудь поставить http://localhost:8082
-  const API_BASE = 'http://localhost:8082';
-
-  return {
-    teacher: { name: '' },
-    stats: { students_count: 0, courses_count: 0, avg_progress: 0 },
-    students: [],
-    filter: '',
-    selectedStudent: null,
-    assignments: [],
-    courses: [],
-    modules: [],
-    createLessonModal: { open: false },
-    form: { course_id: '', module_id: '', order: 1, title: '', description: '' },
-
-    async init(){
-      await this.loadDashboard();
-    },
-
-    async loadDashboard(){
-      try {
-        const token = localStorage.getItem('accessToken') || '';
-        const res = await fetch(`${API_BASE}/api/teacher/dashboard`, {
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': 'Bearer ' + token } : {})
-          }
-        });
-        if (!res.ok) {
-          // подсказка: 401/403/404 -> проверь backend, путь и CORS
-          throw new Error('Ошибка загрузки: ' + res.status);
+function teacherApp() {
+    const API_BASE = 'http://127.0.0.1:8082';
+    
+    return {
+        loading: true,
+        isTeacher: false,
+        teacherData: null,
+        currentTab: 'dashboard',
+        
+        // Данные
+        stats: {
+            courses: 0,
+            students: 0,
+            assignments: 0,
+            avg_progress: 0
+        },
+        courses: [],
+        students: [],
+        studentSearch: '',
+        assignments: [],
+        assignmentFilter: '',
+        assignmentSearch: '',
+        recentActivities: [],
+        
+        async init() {
+            // Проверяем авторизацию
+            const session = localStorage.getItem('userSession');
+            if (!session) {
+                window.location.href = '../index.html';
+                return;
+            }
+            
+            try {
+                const parsedSession = JSON.parse(session);
+                const token = parsedSession.access;
+                
+                if (!token) {
+                    window.location.href = '../index.html';
+                    return;
+                }
+                
+                // Получаем данные пользователя
+                const userResponse = await fetch(`${API_BASE}/api/v1/users/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!userResponse.ok) {
+                    console.error('Ошибка получения данных пользователя:', userResponse.status);
+                    window.location.href = '../index.html';
+                    return;
+                }
+                
+                const userData = await userResponse.json();
+                this.teacherData = userData;
+                
+                // Проверяем, является ли пользователь преподавателем
+                if (userData.type !== 'teacher') {
+                    this.isTeacher = false;
+                    this.loading = false;
+                    return;
+                }
+                
+                this.isTeacher = true;
+                
+                // Загружаем данные для панели
+                await this.loadStats();
+                await this.loadRecentActivities();
+                await this.loadCourses();
+                await this.loadStudents();
+                await this.loadAssignments();
+                
+            } catch (error) {
+                console.error('Ошибка инициализации:', error);
+                window.location.href = '../index.html';
+                return;
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        async loadStats() {
+            try {
+                const token = JSON.parse(localStorage.getItem('userSession')).access;
+                const response = await fetch(`${API_BASE}/api/teacher/dashboard`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    this.stats = data.stats || {};
+                    this.courses = data.courses || [];
+                    this.recentActivities = data.recent_activities || [];
+                } else {
+                    console.error('Ошибка загрузки статистики:', response.status);
+                    this.stats = { courses: 0, students: 0, assignments: 0, avg_progress: 0 };
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки статистики:', error);
+                this.stats = { courses: 0, students: 0, assignments: 0, avg_progress: 0 };
+            }
+        },
+        
+        async loadCourses() {
+            try {
+                const token = JSON.parse(localStorage.getItem('userSession')).access;
+                const response = await fetch(`${API_BASE}/api/teacher/courses`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    this.courses = await response.json();
+                } else {
+                    console.error('Ошибка загрузки курсов:', response.status);
+                    this.courses = [];
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки курсов:', error);
+                this.courses = [];
+            }
+        },
+        
+        async loadStudents() {
+            try {
+                const token = JSON.parse(localStorage.getItem('userSession')).access;
+                const response = await fetch(`${API_BASE}/api/teacher/students`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    this.students = await response.json();
+                } else {
+                    console.error('Ошибка загрузки студентов:', response.status);
+                    this.students = [];
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки студентов:', error);
+                this.students = [];
+            }
+        },
+        
+        async loadAssignments() {
+            try {
+                const token = JSON.parse(localStorage.getItem('userSession')).access;
+                const response = await fetch(`${API_BASE}/api/teacher/assignments`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    this.assignments = await response.json();
+                } else {
+                    console.error('Ошибка загрузки назначений:', response.status);
+                    this.assignments = [];
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки назначений:', error);
+                this.assignments = [];
+            }
+        },
+        
+        async loadRecentActivities() {
+            try {
+                const token = JSON.parse(localStorage.getItem('userSession')).access;
+                const response = await fetch(`${API_BASE}/api/teacher/activities/recent`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    this.recentActivities = await response.json();
+                } else {
+                    console.error('Ошибка загрузки активностей:', response.status);
+                    this.recentActivities = [];
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки активностей:', error);
+                this.recentActivities = [];
+            }
+        },
+        
+        get filteredStudents() {
+            if (!this.studentSearch) return this.students;
+            
+            const search = this.studentSearch.toLowerCase();
+            return this.students.filter(student => 
+                (student.name && student.name.toLowerCase().includes(search)) ||
+                (student.surname && student.surname.toLowerCase().includes(search)) ||
+                (student.email && student.email.toLowerCase().includes(search)) ||
+                (student.phone && student.phone.toLowerCase().includes(search)) ||
+                (student.group_code && student.group_code.toLowerCase().includes(search))
+            );
+        },
+        
+        get filteredAssignments() {
+            let filtered = this.assignments;
+            
+            // Фильтр по статусу
+            if (this.assignmentFilter) {
+                filtered = filtered.filter(a => a.status === this.assignmentFilter);
+            }
+            
+            // Поиск
+            if (this.assignmentSearch) {
+                const search = this.assignmentSearch.toLowerCase();
+                filtered = filtered.filter(a => 
+                    (a.student_name && a.student_name.toLowerCase().includes(search)) ||
+                    (a.lesson_title && a.lesson_title.toLowerCase().includes(search))
+                );
+            }
+            
+            return filtered;
+        },
+        
+        formatDate(dateString, short = false) {
+            if (!dateString) return 'Не указана';
+            
+            try {
+                const date = new Date(dateString);
+                if (short) {
+                    return date.toLocaleDateString('ru-RU');
+                } else {
+                    return date.toLocaleDateString('ru-RU', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                }
+            } catch (e) {
+                return dateString;
+            }
+        },
+        
+        viewCourse(courseId) {
+            alert('Просмотр курса с ID: ' + courseId + '\n(Функция будет реализована)');
+        },
+        
+        editCourse(courseId) {
+            alert('Редактирование курса с ID: ' + courseId + '\n(Функция будет реализована)');
+        },
+        
+        viewStudent(studentId) {
+            alert('Просмотр студента с ID: ' + studentId + '\n(Функция будет реализована)');
+        },
+        
+        openCreateCourse() {
+            alert('Форма создания курса (будет реализована)');
+        },
+        
+        openCreateAssignment() {
+            alert('Форма создания задания (будет реализована)');
+        },
+        
+        resetFilters() {
+            this.assignmentFilter = '';
+            this.assignmentSearch = '';
+            this.studentSearch = '';
+        },
+        
+        logout() {
+            localStorage.removeItem('userSession');
+            window.location.href = '../index.html';
         }
-        const data = await res.json();
-        this.teacher = data.teacher || { name: '' };
-        this.students = data.students || [];
-        this.courses = data.courses || [];
-        this.stats.students_count = this.students.length;
-        this.stats.courses_count = this.courses.length;
-        const avg = this.students.reduce((acc, s) => acc + (s.avg_progress || 0), 0) / (this.students.length || 1);
-        this.stats.avg_progress = Math.round(avg);
-      } catch (e) {
-        console.error(e);
-        // Показываем одно аккуратное сообщение, не дубля alert'ов
-        alert('Не удалось загрузить данные панели. Проверьте, запущен ли backend и правильный ли API_BASE.');
-      }
-    },
-
-    get filteredStudents(){
-      if (!this.filter) return this.students;
-      return this.students.filter(s => (s.name || '').toLowerCase().includes(this.filter.toLowerCase()) || (s.email || '').toLowerCase().includes(this.filter.toLowerCase()));
-    },
-
-    selectStudent(s){
-      this.selectedStudent = s;
-      this.assignments = [];
-    },
-
-    async loadAssignments(userId){
-      try {
-        const token = localStorage.getItem('accessToken') || '';
-        // Важно: роутер assignments использует /api/teacher/assignments/user/{user_id}
-        const res = await fetch(`${API_BASE}/api/teacher/assignments/user/${encodeURIComponent(userId)}`, {
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': 'Bearer ' + token } : {})
-          }
-        });
-        if (!res.ok) throw new Error('Ошибка загрузки назначений: ' + res.status);
-        const data = await res.json();
-
-        // Пополнить lesson_title/urls если возможно (опционально)
-        for (let a of data) {
-          a.lesson_title = a.lesson_title || null;
-          a.pptx_url = a.pptx_url || null;
-          a.homework_url = a.homework_url || null;
-        }
-        this.assignments = data;
-      } catch (e) {
-        console.error(e);
-        alert('Не удалось загрузить назначения. Проверьте API и CORS.');
-      }
-    },
-
-    openCreateLesson(){
-      if (!this.selectedStudent) return alert('Выберите студента');
-      this.createLessonModal.open = true;
-      if (!this.courses || this.courses.length === 0) this.loadDashboard();
-    },
-
-    closeCreateLesson(){
-      this.createLessonModal.open = false;
-      this.form = { course_id: '', module_id: '', order: 1, title: '', description: '' };
-      this.modules = [];
-      const pf = document.getElementById('pptxFile'); if (pf) pf.value = null;
-      const hf = document.getElementById('homeworkFile'); if (hf) hf.value = null;
-    },
-
-    async loadModulesForCourse(){
-      try {
-        if (!this.form.course_id) return;
-        const res = await fetch(`${API_BASE}/api/courses/${this.form.course_id}/modules`);
-        if (!res.ok) throw new Error('modules fetch failed');
-        const mods = await res.json();
-        this.modules = mods;
-      } catch (e) {
-        console.warn(e);
-        this.modules = [];
-      }
-    },
-
-    async createLessonAndAssign(){
-      try {
-        if (!this.form.module_id) return alert('Выберите модуль');
-        if (!this.form.title) return alert('Введите заголовок урока');
-
-        const pptxInput = document.getElementById('pptxFile');
-        const hwInput = document.getElementById('homeworkFile');
-
-        const formData = new FormData();
-        formData.append('order', String(this.form.order));
-        formData.append('title', this.form.title);
-        if (this.form.description) formData.append('description', this.form.description);
-        if (pptxInput && pptxInput.files[0]) formData.append('pptx_file', pptxInput.files[0]);
-        if (hwInput && hwInput.files[0]) formData.append('homework_file', hwInput.files[0]);
-
-        const token = localStorage.getItem('accessToken') || '';
-        const url = `${API_BASE}/api/teacher/courses/${this.form.course_id}/modules/${this.form.module_id}/lessons`;
-        const res = await fetch(url, { method: 'POST', body: formData, headers: (token ? { 'Authorization': 'Bearer ' + token } : {}) });
-        if (!res.ok) {
-          const t = await res.text();
-          throw new Error(t || 'Ошибка создания урока');
-        }
-        const lesson = await res.json();
-
-        const assignRes = await fetch(`${API_BASE}/api/teacher/assignments`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': 'Bearer ' + token } : {}) },
-          body: JSON.stringify({ user_id: this.selectedStudent.id, lesson_id: lesson.id })
-        });
-        if (!assignRes.ok) throw new Error('Ошибка назначения урока');
-        alert('Урок создан и назначен студенту');
-        this.closeCreateLesson();
-        this.loadAssignments(this.selectedStudent.id);
-      } catch (e) {
-        console.error(e);
-        alert('Не удалось создать/назначить урок: ' + (e.message || 'Ошибка'));
-      }
-    },
-
-    logout(){
-        localStorage.removeItem('accessToken');
-        window.location.href = '/skillmap/index.html';
     }
-  }
 }
 </script>
 

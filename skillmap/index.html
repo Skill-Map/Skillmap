@@ -248,15 +248,50 @@
                         access: data.access
                     }));
                     
-                    this.user.isAuthenticated = true;
-                    this.user.email = this.loginForm.email;
-                    this.closeModal();
-                    this.showNotification('Вход выполнен успешно!');
+                    // Теперь получаем полную информацию о пользователе
+                    try {
+                        const userResponse = await fetch(`${API_BASE}/api/v1/users/me`, {
+                            headers: {
+                                'Authorization': `Bearer ${data.access}`
+                            }
+                        });
+                        
+                        if (userResponse.ok) {
+                            const userData = await userResponse.json();
+                            
+                            // Сохраняем полные данные пользователя в сессии
+                            const session = JSON.parse(localStorage.getItem('userSession'));
+                            session.userData = userData;
+                            localStorage.setItem('userSession', JSON.stringify(session));
+                            
+                            this.user.isAuthenticated = true;
+                            this.user.email = this.loginForm.email;
+                            this.user.name = userData.name || this.loginForm.email.split('@')[0];
+                            
+                            this.closeModal();
+                            this.showNotification('Вход выполнен успешно!');
+                            
+                            // ПЕРЕНАПРАВЛЕНИЕ В ЗАВИСИМОСТИ ОТ РОЛИ
+                            setTimeout(() => {
+                                if (userData.type === 'teacher') {
+                                    window.location.href = 'teacher/main.html';
+                                } else if (userData.type === 'admin') {
+                                    window.location.href = 'admin.html';
+                                } else {
+                                    // Все остальные (apprentice, moderator) идут в профиль студента
+                                    window.location.href = 'student/profile.html';
+                                }
+                            }, 1000);
+                            
+                        } else {
+                            this.modal.error = 'Не удалось получить данные пользователя.';
+                        }
+                        
+                    } catch (error) {
+                        console.error('Ошибка получения данных пользователя:', error);
+                        this.modal.error = 'Ошибка соединения при получении данных пользователя.';
+                    }
                     
-                    // Перенаправляем на страницу профиля
-                    setTimeout(() => {
-                        window.location.href = 'student/profile.html';
-                    }, 1000);
                 } else {
                     this.modal.error = data.detail || data.message || 'Произошла ошибка входа.';
                 }
@@ -304,7 +339,13 @@
                         const parsedSession = JSON.parse(session);
                         this.user.isAuthenticated = true;
                         this.user.email = parsedSession.email;
-                        this.user.name = parsedSession.name || parsedSession.email.split('@')[0];
+                        
+                        // Если есть сохраненные данные пользователя, используем их
+                        if (parsedSession.userData) {
+                            this.user.name = parsedSession.userData.name || parsedSession.email.split('@')[0];
+                        } else {
+                            this.user.name = parsedSession.email.split('@')[0];
+                        }
                     } catch (e) {
                         console.error('Ошибка парсинга сессии:', e);
                         localStorage.removeItem('userSession'); // Удаляем поврежденную сессию

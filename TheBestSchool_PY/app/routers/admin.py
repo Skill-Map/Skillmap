@@ -740,3 +740,240 @@ async def get_user_courses_as_teacher(
         "total_courses": len(formatted_courses),
         "courses": formatted_courses
     }
+    
+# ============ НАЗНАЧЕНИЕ ПРЕПОДАВАТЕЛЕЙ НА КУРСЫ ============
+
+@router.get("/courses/{course_id}/teachers")
+async def get_course_teachers(
+    course_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_role("admin"))
+):
+    """Получить преподавателей назначенных на курс"""
+    result = await db.execute(
+        select(models.TeacherCourseAssignment, models.User)
+        .join(models.User, models.TeacherCourseAssignment.teacher_id == models.User.id)
+        .where(
+            models.TeacherCourseAssignment.course_id == course_id,
+            models.TeacherCourseAssignment.status == "active"
+        )
+        .order_by(models.User.surname, models.User.name)
+    )
+    
+    assignments = result.all()
+    
+    teachers = []
+    for assignment, teacher in assignments:
+        teachers.append({
+            "assignment_id": str(assignment.id),
+            "teacher_id": str(teacher.id),
+            "teacher_name": f"{teacher.surname} {teacher.name}",
+            "teacher_email": teacher.email,
+            "assigned_at": assignment.assigned_at.isoformat() if assignment.assigned_at else None,
+            "assigned_by": str(assignment.assigned_by)
+        })
+    
+    return teachers
+
+@router.post("/courses/{course_id}/assign-teacher")
+async def assign_teacher_to_course(
+    course_id: uuid.UUID,
+    payload: Dict[str, Any] = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin"))
+):
+    """Назначить преподавателя на курс"""
+    teacher_id = payload.get("teacher_id")
+    
+    if not teacher_id:
+        raise HTTPException(status_code=400, detail="Необходимо указать teacher_id")
+    
+    # Проверяем существование курса
+    course = await _get_course_or_404(db, course_id)
+    
+    # Проверяем существование преподавателя
+    teacher_result = await db.execute(
+        select(models.User).where(
+            models.User.id == teacher_id,
+            models.User.type == "teacher"
+        )
+    )
+    teacher = teacher_result.scalar_one_or_none()
+    
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Преподаватель не найден или не является учителем")
+    
+    # Проверяем, не назначен ли уже преподаватель на этот курс
+    existing_result = await db.execute(
+        select(models.TeacherCourseAssignment).where(
+            models.TeacherCourseAssignment.course_id == course.id,
+            models.TeacherCourseAssignment.teacher_id == teacher.id,
+            models.TeacherCourseAssignment.status == "active"
+        )
+    )
+    
+    if existing_result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Преподаватель уже назначен на этот курс")
+    
+    # Создаем назначение
+    assignment = models.TeacherCourseAssignment(
+        teacher_id=teacher.id,
+        course_id=course.id,
+        assigned_by=current_user.id,
+        status="active"
+    )
+    
+    db.add(assignment)
+    await db.commit()
+    await db.refresh(assignment)
+    
+    return {
+        "message": "Преподаватель успешно назначен на курс",
+        "assignment_id": str(assignment.id),
+        "course_name": course.name,
+        "teacher_name": f"{teacher.surname} {teacher.name}"
+    }
+
+@router.delete("/courses/{course_id}/teachers/{teacher_id}")
+async def remove_teacher_from_course(
+    course_id: uuid.UUID,
+    teacher_id: str,
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_role("admin"))
+):
+    """Удалить преподавателя с курса"""
+    result = await db.execute(
+        select(models.TeacherCourseAssignment).where(
+            models.TeacherCourseAssignment.course_id == course_id,
+            models.TeacherCourseAssignment.teacher_id == teacher_id,
+            models.TeacherCourseAssignment.status == "active"
+        )
+    )
+    
+    assignment = result.scalar_one_or_none()
+    
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Назначение не найдено")
+    
+    # Мягкое удаление - меняем статус
+    assignment.status = "inactive"
+    await db.commit()
+    
+    return {
+        "message": "Преподаватель удален с курса",
+        "course_id": str(course_id),
+        "teacher_id": teacher_id
+    }
+
+@router.get("/teachers/available")
+async def get_available_teachers(
+    course_id: Optional[uuid.UUID] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_role("admin"))
+):
+    """Получить доступных преподавателей (не назначенных на курс)"""
+    # Получаем всех преподавателей
+    teachers_query = select(models.User).where(
+        models.User.type == "teacher",
+        models.User.active == True
+    ).order_by(models.User.surname, models.User.name)
+    
+    result = await db.execute(teachers_query)
+    all_teachers = result.scalars().all()
+    
+    available_teachers = []
+    
+    for teacher in all_teachers:
+        teacher_data = {
+            "id": str(teacher.id),
+            "name": f"{teacher.surname} {teacher.name}",
+            "email": teacher.email,
+            "department": teacher.department or "",
+            "title": teacher.title or "",
+            "assigned_courses": []
+        }
+        
+        # Если указан course_id, проверяем назначен ли уже преподаватель на этот курс
+        if course_id:
+            assignment_result = await db.execute(
+                select(models.TeacherCourseAssignment).where(
+                    models.TeacherCourseAssignment.course_id == course_id,
+                    models.TeacherCourseAssignment.teacher_id == teacher.id,
+                    models.TeacherCourseAssignment.status == "active"
+                )
+            )
+            
+            is_assigned = assignment_result.scalar_one_or_none() is not None
+            teacher_data["is_assigned"] = is_assigned
+        
+        # Получаем курсы на которые назначен преподаватель
+        assignments_result = await db.execute(
+            select(models.TeacherCourseAssignment, models.Course)
+            .join(models.Course, models.TeacherCourseAssignment.course_id == models.Course.id)
+            .where(
+                models.TeacherCourseAssignment.teacher_id == teacher.id,
+                models.TeacherCourseAssignment.status == "active"
+            )
+        )
+        
+        for assignment, course in assignments_result.all():
+            teacher_data["assigned_courses"].append({
+                "course_id": str(course.id),
+                "course_name": course.name,
+                "assigned_at": assignment.assigned_at.isoformat() if assignment.assigned_at else None
+            })
+        
+        available_teachers.append(teacher_data)
+    
+    return available_teachers
+
+@router.get("/users/teachers")
+async def get_all_teachers(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    search: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_role("admin"))
+):
+    """Получить всех преподавателей"""
+    query = select(models.User).where(
+        models.User.type == "teacher"
+    ).order_by(models.User.surname, models.User.name)
+    
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(or_(
+            models.User.name.ilike(search_term),
+            models.User.surname.ilike(search_term),
+            models.User.email.ilike(search_term),
+        ))
+    
+    query = query.offset(skip).limit(limit)
+    result = await db.execute(query)
+    teachers = result.scalars().all()
+    
+    teachers_list = []
+    for teacher in teachers:
+        # Подсчитываем количество назначенных курсов
+        courses_count_result = await db.execute(
+            select(func.count(models.TeacherCourseAssignment.id))
+            .where(
+                models.TeacherCourseAssignment.teacher_id == teacher.id,
+                models.TeacherCourseAssignment.status == "active"
+            )
+        )
+        courses_count = courses_count_result.scalar() or 0
+        
+        teachers_list.append({
+            "id": str(teacher.id),
+            "name": f"{teacher.surname} {teacher.name}",
+            "email": teacher.email,
+            "phone": teacher.phone or "",
+            "department": teacher.department or "",
+            "title": teacher.title or "",
+            "active": bool(teacher.active),
+            "hire_date": teacher.hire_date or "",
+            "courses_count": courses_count
+        })
+    
+    return teachers_list

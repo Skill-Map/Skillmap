@@ -423,3 +423,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isAuthenticated = await api.checkAuth();
     updateAuthUI(isAuthenticated);
 });
+
+// auth-min.js - минимизированная версия
+document.addEventListener('DOMContentLoaded',function(){
+    fetch('/api/auth/check-redirect',{credentials:'include'})
+    .then(r=>r.ok?r.json():null).then(d=>{if(d&&d.redirect)setTimeout(()=>location.href=d.url,100)});
+    
+    function h(e){e.preventDefault();fetch('/api/auth/me',{credentials:'include'}).then(r=>r.ok?r.json():null)
+    .then(u=>{if(u&&u.authenticated)fetch('/api/auth/check-redirect',{credentials:'include'})
+    .then(r=>r.ok?r.json():null).then(d=>{location.href=d&&d.redirect?d.url:'/dashboard'});
+    else location.href=e.target.href||'/register'})}
+    
+    document.querySelectorAll('.create-skills-btn,.start-free-btn,.get-started-btn').forEach(b=>{
+        b.onclick=h});
+});

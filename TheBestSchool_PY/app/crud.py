@@ -30,10 +30,6 @@ async def get_users(db: AsyncSession, skip: int = 0, limit: int = 100):
     return result.scalars().all()
 
 async def create_user(db: AsyncSession, email: str, password: str, **extra):
-    """
-    Универсальный create_user.
-    Принимает email, password и любые дополнительные поля через **extra
-    """
     hashed_password = get_password_hash(password)
     payload = {"id": str(uuid.uuid4()), "email": email, "password": hashed_password}
     payload.update(extra)
@@ -80,14 +76,13 @@ async def delete_user(db: AsyncSession, user_id: str):
     
     return db_user
 
-# CRUD для специфичных типов
 async def get_users_by_type(db: AsyncSession, user_type: str):
     result = await db.execute(
         select(models.User).where(models.User.type == user_type)
     )
     return result.scalars().all()
+3
 
-# CRUD для Training
 async def create_training(db: AsyncSession, training: schemas.TrainingCreate, teacher_id: str, apprentice_id: str):
     db_training = models.Training(
         number_gym=training.number_gym,
@@ -210,13 +205,34 @@ async def get_users_by_type(db: AsyncSession, user_type: str):
         )
     return result.scalars().all()
 
-async def authenticate_user(db: AsyncSession, username: str, password: str):
-    result = await db.execute(
-        select(User).where(User.email == username)
-    )
-    user = result.scalars().first()
-    if not user:
-        return None
-    if not verify_password(password, user.password):
-        return None
-    return user
+# crud.py
+async def authenticate_user(db: AsyncSession, email: str, password: str):
+    """Аутентификация пользователя по email и паролю"""
+    try:
+        # Получаем пользователя
+        result = await db.execute(
+            select(models.User).where(models.User.email == email)
+        )
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            print(f"Пользователь с email {email} не найден")
+            return False
+        
+        # Проверяем активность
+        if not user.active:
+            print(f"Пользователь {email} не активен")
+            return False
+        
+        # Проверяем пароль
+        # Проверьте, какое поле в вашей модели: password или password_hash
+        if not verify_password(password, user.password):  # ИЛИ user.password_hash
+            print(f"Неверный пароль для пользователя {email}")
+            return False
+        
+        print(f"Успешная аутентификация для {email}")
+        return user
+        
+    except Exception as e:
+        print(f"Ошибка при аутентификации: {e}")
+        return False
