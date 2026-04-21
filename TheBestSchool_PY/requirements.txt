@@ -9,6 +9,6 @@ passlib[bcrypt]==1.7.4
 python-multipart==0.0.18
 pydantic==2.5.0
 pydantic-settings==2.1.0
-python-dotenv==1.0.0
+python-dotenv==1.2.2
 email-validator==2.1.0.post1
 argon2-cffi
